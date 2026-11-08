@@ -1,0 +1,17 @@
+{
+  "name": "MSI Claw A8 Controller Suite",
+  "author": "sekirofly",
+  "flags": [
+    "root"
+  ],
+  "api_version": 1,
+  "version": "0.1.0-alpha.1",
+  "publish": {
+    "tags": [
+      "system",
+      "controller",
+      "root"
+    ],
+    "description": "Embedded MSI Claw A8 controller configuration, back buttons and rumble."
+  }
+}
