@@ -18,6 +18,8 @@ Virtual controller identity, hardware back-button mode and button mapping are se
 
 ## Research and implementation plan
 
+The proposed integration design is ready for review: [简体中文设计草案](docs/design.zh-CN.md). It retains Xbox Elite compatibility, separates global hardware controls from per-game virtual-controller/mapping settings, and proposes a compact quick panel with a full settings page. Implementation awaits user review.
+
 See [code research and capability matrix](docs/research.md), [中文调研与路线](docs/research.zh-CN.md), and [source provenance](THIRD_PARTY.md).
 
 First implementation milestone: port the proven hardware controls and add read-only device/capability discovery. No automatic InputPlumber restart or controller replacement on startup. Subsequent milestones require A8 testing of input, rumble, menu buttons and recovery paths.
