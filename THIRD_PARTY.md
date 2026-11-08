@@ -1,6 +1,6 @@
 # Source provenance and planned reuse
 
-Implementation provenance: `backend/hardware.py` derives from the existing v1.0.1 MIT sysfs discovery/read/write implementation, expanded with board/topology checks. Full original notice is retained in `third_party/hardware-controls-MIT.txt`. Build configuration and dependency lockfile also originate from that project.
+Implementation provenance: `backend/hardware.py` derives from the existing v1.0.1 MIT sysfs discovery/read/write implementation, expanded with board/topology checks. Full original notice is retained in `third_party/hardware-controls-MIT.txt`. Build configuration, dependency lockfile, installer/maintenance runner, diagnostics and installer tests also derive from that MIT project.
 
 | Source | Reviewed revision | Declared license | Role |
 | --- | --- | --- | --- |
@@ -12,4 +12,4 @@ Project license choice: GPL-3.0-only. The GNU GPL v3 text in LICENSE is the stan
 
 Before importing source, record source paths/revisions and preserve each applicable copyright/license notice. Audit Decky API/UI and other dependency requirements when dependencies are introduced. Existing MIT code retains its MIT notice within any GPL-distributed combined work.
 
-Frontend dependency: `@decky/api` 1.1.3 is LGPL-2.1. `scripts/package.py` includes its source/license and this project's rebuildable sources in the CI development archive. React and UI are provided by Decky at runtime. This is a development artifact, not a production installer. Audit any additional dependencies before distribution.
+Frontend dependency: `@decky/api` 1.1.3 is LGPL-2.1. `scripts/package.py` includes its source/license and this project's rebuildable sources in the CI development archive. React and UI are provided by Decky at runtime. The preview archive also bundles pure-Python PyYAML 6.0.3 and its MIT license. Audit any additional dependencies before distribution.

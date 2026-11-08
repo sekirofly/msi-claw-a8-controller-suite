@@ -18,6 +18,7 @@ const deleteConfig = callable<[string, number], Result<State>>('delete_config');
 const setHardware = callable<[string | null, number | null, number | null], Result<State['hardware']>>('set_hardware');
 const testRumble = callable<[], Result<boolean>>('test_rumble');
 const manage = callable<[boolean], Result<State>>('set_management');
+const maintenance = callable<[string], Result<boolean>>('maintenance');
 const reportGame = callable<[string | null, string], Result<unknown>>('report_game');
 const buttons = ['M1','M2','A','B','X','Y','LB','RB','LS','RS','Up','Down','Left','Right','Menu','View'];
 const keys = ['Space','Enter','Esc','Tab','LeftShift','LeftCtrl','LeftAlt', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
@@ -41,6 +42,8 @@ function errorText(code?: string): string {
     config_corrupt:['配置文件无法读取，未覆盖原文件','Configuration unreadable; original file was not overwritten'],
     test_busy:['测试进行中，请稍候','Test in progress; please wait'],
     readback_failed:['读取结果与请求不符，请检查设备','Read-back mismatch; check the device'],
+    maintenance_pending:['维护已安排，Decky 将重启；若未完成请检查维护日志或重新加载 Decky。','Maintenance scheduled; Decky will restart. If it does not complete, check the maintenance journal or reload Decky.'],
+    nonstandard_install:['安装位置异常，请使用终端维护命令。','Nonstandard installation; use the terminal maintenance command.'],
   };
   const m = messages[code ?? ''];
   return m ? t(...m) : t('操作失败，请查看日志：','Operation failed; check logs: ') + (code ?? 'unknown');
@@ -227,9 +230,15 @@ function Settings({page}:{page:'configs'|'templates'|'hardware'|'about'}) {
       {row(t('背键硬件模式可能影响独立 M1/M2 事件；不会自动更改。','Hardware back-button mode can affect independent M1/M2 events; it is never changed automatically.'))}
     </PanelSection><RumblePanel c={c}/></>}
     {page==='about'&&<PanelSection title={t('维护与诊断','Maintenance and diagnostics')}>
-      {row('0.1.0-alpha.1 · GPL-3.0-only')}
+      {row('0.1.0-alpha.2 · GPL-3.0-only')}
       {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
       {row(t('恢复：先到手柄设置停用管理。终端恢复和卸载方法见 README。','Recovery: disable management in device settings first. See README for terminal recovery and removal.'))}
+      {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
+        action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装当前版本','Repair current version'),
+        t('将短暂重启 Decky，并先恢复接管前的输入配置。修复保留按键配置；干净卸载/重装会清除它们。硬件震动与背键模式不重置。恢复失败时保留文件。','Decky restarts briefly. Original input state is restored first. Repair keeps button configurations; clean reinstall/uninstall clears them. Hardware settings are not reset. Files are preserved if restoration fails.'),
+        ()=>void c.run(()=>enqueue(()=>maintenance(action))))}>
+        {action==='uninstall'?t('干净卸载','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装 · 保留配置','Repair installation · keep configurations')}
+      </ButtonItem></PanelSectionRow>)}
       <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>void c.run(async()=>{})}>{t('刷新诊断','Refresh diagnostics')}</ButtonItem></PanelSectionRow>
       {row(JSON.stringify({hardware:s.hardware, hardware_error:s.hardware_error, inputplumber:s.inputplumber,inputplumber_error:s.inputplumber_error,can_test:s.can_test},null,2))}
     </PanelSection>}

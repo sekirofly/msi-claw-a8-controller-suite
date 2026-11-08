@@ -1,6 +1,8 @@
 """Explicit terminal recovery, independent of Steam/Decky navigation."""
 import argparse
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'py_modules'))
 from backend.hardware import Hardware
 from backend.inputplumber import InputPlumber
 

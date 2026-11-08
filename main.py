@@ -8,6 +8,7 @@ import time
 
 # Decky loads main.py directly, not as a Python package.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'py_modules'))
 from backend.config import Store, SuiteError, valid_id
 from backend.hardware import Hardware
 from backend.inputplumber import InputPlumber
@@ -27,6 +28,7 @@ class Plugin:
         self.applied = None
         self.apply_error = None
         self.last_test = 0.0
+        self.maintaining = False
 
     def setup(self):
         if self.store is None:
@@ -48,6 +50,8 @@ class Plugin:
     def work(self, fn):
         try:
             self.setup()
+            if self.maintaining:
+                raise SuiteError('maintenance_pending')
             return {'ok': True, 'data': fn()}
         except Exception as exc:
             code = str(exc) if isinstance(exc, SuiteError) else 'operation_failed'
@@ -151,6 +155,37 @@ class Plugin:
     async def _main(self):
         # Explicit activation is required. Reading the panel never activates it.
         pass
+
+    async def maintenance(self, action):
+        def schedule():
+            if action not in ('install', 'reinstall', 'uninstall'):
+                raise SuiteError('invalid_rules')
+            import shutil
+            import subprocess
+            import tempfile
+            import importlib.util
+            root = Path(__file__).resolve().parent
+            spec = importlib.util.spec_from_file_location('suite_installer', root / 'installer.py')
+            installer = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(installer)
+            home = installer.validate_home(os.environ['DECKY_HOME'])
+            if root != home / 'plugins' / installer.FOLDER:
+                raise SuiteError('nonstandard_install')
+            if Path(os.environ['DECKY_PLUGIN_SETTINGS_DIR']).resolve() != home / 'settings' / installer.FOLDER:
+                raise SuiteError('nonstandard_install')
+            directory = Path(tempfile.mkdtemp(prefix='msi-claw-a8-controller-suite-maintenance-', dir='/run'))
+            try:
+                for name in ('installer.py', 'maintenance_runner.py'):
+                    shutil.copyfile(root / name, directory / name)
+                subprocess.run(['systemd-run', '--unit=msi-claw-a8-controller-suite-maintenance', '--on-active=3s',
+                                '--collect', '/usr/bin/python3', str(directory / 'maintenance_runner.py'),
+                                action, '--decky-home', str(home)], check=True, capture_output=True, text=True, timeout=15)
+            except Exception:
+                shutil.rmtree(directory)
+                raise
+            self.maintaining = True
+            return True
+        return await self.operation(schedule)
 
     async def _unload(self):
         # Updates/reloads must not reset hardware or destroy the recovery snapshot.
