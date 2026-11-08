@@ -31,8 +31,9 @@ class Plugin:
     def setup(self):
         if self.store is None:
             directory = Path(os.environ['DECKY_PLUGIN_SETTINGS_DIR'])
-            self.store = Store(directory / 'config.json')
-            self.ip = InputPlumber(self.hardware, directory / 'recovery.json')
+            store = Store(directory / 'config.json')
+            ip = InputPlumber(self.hardware, directory / 'recovery.json')
+            self.store, self.ip = store, ip
 
     async def operation(self, fn):
         async with self.lock:
