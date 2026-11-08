@@ -18,7 +18,7 @@ The UI represents the actual A8 buttons, including M1/M2. Steam may still identi
 
 ## Research and implementation plan
 
-The proposed integration design is ready for review: [简体中文设计草案](docs/design.zh-CN.md). It retains Xbox Elite compatibility, separates global hardware controls from per-game mapping settings, and proposes a compact quick panel with a full settings page. Implementation awaits user review.
+The proposed integration design is ready for review: [简体中文设计草案](docs/design.zh-CN.md). The quick panel shows active mappings and shared rumble controls; infrequent hardware back-button modes move into device settings. Game-specific mappings start as independent copies of default mappings, with explicit editing scope and save actions. Library presets are copied into configurations rather than silently linked. Implementation awaits user review.
 
 See [code research and capability matrix](docs/research.md), [中文调研与路线](docs/research.zh-CN.md), and [source provenance](THIRD_PARTY.md).
 
