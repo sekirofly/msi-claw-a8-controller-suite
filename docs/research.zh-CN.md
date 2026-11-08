@@ -1,5 +1,7 @@
 # DeckyPlumber 调研与 A8 路线
 
+历史调研说明：以下多类型建议已被[当前设计](design.zh-CN.md)取代。产品范围已确定为仅管理 A8 内置手柄、固定 Xbox Elite 输出、不提供虚拟类型选择。
+
 调研日期：2026-11-07。依据为最新拉取的 DeckyPlumber `cebd2fc`（package 0.1.8）和 InputPlumber `6aca920`。完整固定版本源码链接见[英文报告](research.md)。以下是代码调研结论，不代表已在 A8 真机验证。
 
 ## 哪些功能值得用

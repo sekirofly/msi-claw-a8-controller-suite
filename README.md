@@ -9,16 +9,16 @@ A planned Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Ext
 ## Planned scope
 
 - Keep the existing three hardware back-button modes and independent left/right rumble strength controls.
-- Detect the actual A8 controller, InputPlumber capabilities and available virtual controller types.
-- Add supported virtual controller modes, followed by M1/M2 and menu-button remapping.
-- Add optional per-game profiles after manual switching and recovery are validated.
+- Uniquely identify the embedded A8 controller and its InputPlumber capabilities; never target Bluetooth or USB external controllers.
+- Use a fixed Xbox Elite output internally, with an A8-native button interface and no virtual-controller type selector.
+- Add M1/M2 and other A8 button mappings, then optional per-game mapping profiles after recovery is validated.
 - Provide Simplified Chinese and English interfaces, diagnostics, and explicit restore controls.
 
-Virtual controller identity, hardware back-button mode and button mapping are separate settings. Selecting a PlayStation-style virtual device does not add missing physical hardware features.
+The UI represents the actual A8 buttons, including M1/M2. Steam may still identify an Xbox Elite with four paddles. First activation snapshots the original configuration and establishes Elite output only for the verified embedded controller; simply opening the plugin is read-only. Per-game changes only update mappings.
 
 ## Research and implementation plan
 
-The proposed integration design is ready for review: [简体中文设计草案](docs/design.zh-CN.md). It retains Xbox Elite compatibility, separates global hardware controls from per-game virtual-controller/mapping settings, and proposes a compact quick panel with a full settings page. Implementation awaits user review.
+The proposed integration design is ready for review: [简体中文设计草案](docs/design.zh-CN.md). It retains Xbox Elite compatibility, separates global hardware controls from per-game mapping settings, and proposes a compact quick panel with a full settings page. Implementation awaits user review.
 
 See [code research and capability matrix](docs/research.md), [中文调研与路线](docs/research.zh-CN.md), and [source provenance](THIRD_PARTY.md).
 
