@@ -4,11 +4,53 @@
 
 面向 **MSI Claw A8（AMD Ryzen Z2 Extreme / BZ2EM）** 的综合 Decky 手柄管理插件项目。计划继承现有[背键与震动插件](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble)的硬件控制功能，结合 [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber) 的部分 InputPlumber 管理思路。
 
-**当前仅完成调研与设计，尚无可安装插件或发行版。** 现有小插件继续独立维护。第一阶段只针对 A8，不把 Claw 8 AI+ 等其他型号当作已兼容设备。本项目非 MSI 官方产品。
+**v0.1.0-alpha.2 为首个可安装预览版，供 A8 实机测试；不是稳定版，新增功能尚未经真机验证。** 现有小插件继续独立维护。第一阶段只针对 A8，不把 Claw 8 AI+ 等其他型号当作已兼容设备。本项目非 MSI 官方产品。
+
+## 安装与更新
+
+1. 先停用或卸载原 DeckyPlumber 和背键/震动小插件，避免两个后台同时改配置。安装器不会自动删除它们。
+2. 在 SteamOS 桌面模式的 Konsole，以普通用户运行：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.2/install.sh | bash
+```
+
+3. **安装后保存工作并重启，再回游戏模式。** 若重启后仍有震动消失，可按 [MSI 官方 EC 重置说明](https://www.msi.com/support/technical_details/HH_EC_Reset)恢复；不需要每次都做，插件不会自动重置。
+4. 先检查识别状态，以较低强度点击“测试震动”。按键管理默认关闭；确认识别为内置 A8 后，再到“手柄设置”启用，测试一个简单 M1 映射和恢复。
+
+同一安装命令可覆盖更新，保留按键配置，不会再装一份 Suite。更新前会恢复当前接管状态，完成后需要重新启用按键管理。首次替换原插件是不同项目，不会自动合并原插件文件或配置。
+
+安装器验证固定版本 ZIP 和 SHA-256 后短暂重启 Decky，不重启 InputPlumber。包内包含纯 Python YAML 库，不修改系统 Python。识别或接口不满足条件时会禁用相关操作；如果看到未识别提示，请提供诊断，不要自行放宽到任意设备。详细未完成项见[实现状态](implementation-status.zh-CN.md)。
+
+## 重装、卸载与恢复
+
+插件“维护与关于”内提供“修复安装（保留配置）”“干净重装当前版本”“干净卸载”。更新到未来新版本使用该版本的安装命令。终端也可执行：
+
+```sh
+# 干净重装，会清除本插件的按键配置
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.2/install.sh | bash -s -- reinstall
+# 干净卸载
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.2/install.sh | bash -s -- uninstall
+# 离线卸载
+python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
+```
+
+先停止 Decky，恢复接管前的 InputPlumber 输出与映射，再删除本插件文件。恢复失败就中止并保留文件与快照。不会重置硬件背键模式和震动，不删除其他插件；应急快照有意保留在 `~/homebrew/.msi-claw-a8-controller-suite-recovery/`，共享 Decky 记录和系统日志不清除。
+
+默认 Decky 目录为 `~/homebrew`。自定义目录在末尾 `bash` 后加 `-s -- install --decky-home /绝对路径/homebrew`，按需替换动作。不要以 root 启动默认安装命令。
+
+维护失败时查看：
+
+```sh
+journalctl -u msi-claw-a8-controller-suite-maintenance --no-pager -n 100
+sudo bash ~/homebrew/plugins/msi-claw-a8-controller-suite/diagnostics.sh
+```
+
+诊断只读取本地信息，不上传或修改设备。测试期间建议保留触屏或键鼠操作入口。
 
 ## 计划功能
 
-新增：[融合设计草案（待评审）](docs/design.zh-CN.md)，涵盖菜单结构、配置规则和代码合并方案；评审通过后再实现。
+新增：[融合设计草案（待评审）](docs/design.zh-CN.md)，涵盖菜单结构、配置规则和代码合并方案；已获准开始实现，详见[实现状态与限制](implementation-status.zh-CN.md)。
 
 最新 UI 建议：首页只放当前按键状态和共用震动控制，背键硬件模式收进手柄设置。游戏专用按键从默认按键复制为独立配置，明确显示编辑对象和保存范围；方案库以复制导入方式复用，不隐式联动。
 
@@ -28,4 +70,4 @@
 
 显示名统一为 **MSI Claw A8 Controller Suite**；仓库、计划包名和安装目录标识统一为 `msi-claw-a8-controller-suite`；计划安装路径为 `~/homebrew/plugins/msi-claw-a8-controller-suite`。
 
-本项目采用 GPL-3.0-only。目前仅包含原创调研/设计文档及许可证文本，尚未导入其他插件实现。后续复用代码时保留各上游许可和署名，详见 [THIRD_PARTY.md](THIRD_PARTY.md)。
+本项目采用 GPL-3.0-only。当前已有开发实现；硬件控制源自原 MIT 小插件，原许可保留在 `third_party/hardware-controls-MIT.txt`。后续复用代码时保留各上游许可和署名，详见 [THIRD_PARTY.md](THIRD_PARTY.md)。
