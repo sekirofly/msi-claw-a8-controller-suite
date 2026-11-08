@@ -20,6 +20,8 @@ The UI represents the actual A8 buttons, including M1/M2. Steam may still identi
 
 The proposed integration design is ready for review: [简体中文设计草案](docs/design.zh-CN.md). The quick panel shows active mappings and shared rumble controls; infrequent hardware back-button modes move into device settings. Game-specific mappings start as independent copies of default mappings, with explicit editing scope and save actions. Library presets are copied into configurations rather than silently linked. Implementation awaits user review.
 
+Confirmed: each game has at most one independent configuration, copied from defaults, another game's saved configuration, or a template. No live cross-game sharing. See the [pre-implementation integration review](docs/integration-review.zh-CN.md) for source-level conflicts, proposed scope boundaries and hardware checks still required.
+
 See [code research and capability matrix](docs/research.md), [中文调研与路线](docs/research.zh-CN.md), and [source provenance](THIRD_PARTY.md).
 
 First implementation milestone: port the proven hardware controls and add read-only device/capability discovery. No automatic InputPlumber restart or controller replacement on startup. Subsequent milestones require A8 testing of input, rumble, menu buttons and recovery paths.
