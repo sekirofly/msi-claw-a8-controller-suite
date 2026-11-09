@@ -1,5 +1,16 @@
 # Initial implementation status
 
+## Alpha.16: restore installed system defaults
+
+- No new historical snapshots. Enabled mappings are compiled from installed defaults; disable/uninstall restores the installed default profile and A8 targets.
+- Read `profiles/default.yaml` and `devices/50-msi_claw_a8_bz2e.yaml` under InputPlumber's system data directory. Missing/incompatible definitions stop writes. No guessed target name.
+- Persist the management choice and one pending-restoration flag. Successful disable stops automatic writes; failed restore stays disabled and retries on restart.
+- Update/reinstall does not restore first. Reinstall clears mappings but retains management preference. Uninstall preserves files on recovery failure unless explicitly skipped.
+- Legacy snapshots remain backups only. Their captured profiles/targets are never used, and corrupt legacy snapshots do not block management.
+- Based on InputPlumber `6aca920` config/path.rs, composite_device/mod.rs and the A8 system definition. New default-restoration behavior needs A8 hardware validation.
+
+The following sections are historical; Alpha.16 supersedes snapshot-based restoration.
+
 ## Alpha.15: incremental review fixes
 
 - Preserve Alpha.14 file-only updates and avoid rebuilding an already-correct target set.

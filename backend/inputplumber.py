@@ -1,10 +1,10 @@
 """Capability-gated D-Bus adapter. No service restarts or positional selection."""
-import copy
 import json
 import logging
 import subprocess
 import time
 from .config import SuiteError, atomic_json, compile_profile, BUTTONS
+from .defaults import system_defaults
 
 log = logging.getLogger('msi-claw-a8-controller-suite')
 
@@ -50,24 +50,38 @@ class Bus:
 
 
 class InputPlumber:
-    def __init__(self, hardware, snapshot_path, bus=None):
-        self.hardware, self.path, self.bus = hardware, snapshot_path, bus or Bus()
-        self.snapshot = json.loads(self.path.read_text(encoding='utf-8')) if self.path.exists() else None
-        self.preference_path = self.path.with_name('management.json')
+    def __init__(self, hardware, settings_path, bus=None):
+        self.hardware, self.bus = hardware, bus or Bus()
+        self.preference_path = settings_path.with_name('management.json')
         if self.preference_path.exists():
             preference = json.loads(self.preference_path.read_text(encoding='utf-8'))
-            if type(preference.get('enabled')) is not bool:
-                raise SuiteError('config_corrupt')
-            self.enabled = preference['enabled']
         else:
-            # Migrate an explicit legacy stop; an active/paused snapshot stays enabled.
-            self.enabled = bool(self.snapshot.get('active')) if self.snapshot else True
-            self.set_enabled(self.enabled)
+            # One-time migration of the old choice only. Never use its captured
+            # profile/targets; leave recovery.json untouched as a legacy backup.
+            legacy = settings_path.with_name('recovery.json')
+            try:
+                old = json.loads(legacy.read_text()) if legacy.exists() else {}
+            except (ValueError, OSError):
+                old = {}
+            preference = {'enabled': old.get('active', True) if isinstance(old, dict) else True}
+        if not isinstance(preference, dict) or type(preference.get('enabled')) is not bool:
+            raise SuiteError('config_corrupt')
+        self.enabled = preference['enabled']
+        self.restore_pending = preference.get('restore_pending', not self.enabled)
+        if type(self.restore_pending) is not bool:
+            raise SuiteError('config_corrupt')
+        self.persist_preference()
         self.ready = False
+        self.identity = None
+        self.expected_targets = None
+        self.expected_profile = None
+
+    def persist_preference(self):
+        atomic_json(self.preference_path, {'enabled': self.enabled, 'restore_pending': self.restore_pending})
 
     def set_enabled(self, enabled):
-        atomic_json(self.preference_path, {'enabled': enabled})
-        self.enabled = enabled
+        atomic_json(self.preference_path, {'enabled': enabled, 'restore_pending': not enabled})
+        self.enabled, self.restore_pending, self.ready = enabled, not enabled, False
 
     def discover(self):
         identity = self.hardware.discover()
@@ -164,121 +178,62 @@ class InputPlumber:
             time.sleep(.1)
         raise SuiteError('readback_failed')
 
-    def persist(self):
-        atomic_json(self.path, self.snapshot)
-
-    def enable(self):
+    def checked_device(self):
         path, identity = self.discover()
-        base = self.profile(path)
-        original = self.targets(path)
-        supported = self.bus.property(ROOT + '/Manager', 'org.shadowblip.InputManager', 'SupportedTargetDeviceIds')
-        if 'xbox-elite' not in supported:
-            raise SuiteError('elite_unavailable')
-        allowed = {'xb360', 'gamepad', 'xbox-series', 'xbox-elite', 'ds5', 'ds5-edge', 'deck', 'deck-uhid', 'hori-steam', '8bitdo-u2'}
-        games = [x for x in original if x in allowed]
-        if len(games) != 1 or any(x not in allowed | {'keyboard', 'mouse', 'dbus', 'touchscreen', 'touchpad'} for x in original):
-            raise SuiteError('unknown_targets')
-        expected = sorted([x for x in original if x not in allowed] + ['xbox-elite'])
-        if self.snapshot:
-            if identity != self.snapshot['identity']:
-                raise SuiteError('device_changed')
-            # Never replace the first pre-management profile, even after a stop/reboot.
-            expected = self.snapshot['targets']
-            self.snapshot.update(active=True, paused=False, pending=True, expected_profile=base, error=None)
-        else:
-            self.snapshot = {'active': True, 'identity': identity, 'original_profile': base,
-                             'original_targets': original, 'targets': expected, 'expected_profile': base,
-                             'paused': False, 'pending': True}
-        self.persist()  # Durable recovery before first mutation.
-        try:
-            if expected != original:
-                self.set_targets(path, expected)
-            self.snapshot['pending'] = False
-            self.persist()
-            self.ready = True
-        except Exception as exc:
-            self.snapshot['paused'] = True
-            self.snapshot['error'] = str(exc) if isinstance(exc, SuiteError) else 'operation_failed'
-            self.persist()
-            raise
+        if self.identity is not None and identity != self.identity:
+            raise SuiteError('device_changed')
+        self.identity = identity
+        return path
 
     def reconcile(self, rules):
         if not self.enabled:
-            self.restore()
+            if self.restore_pending:
+                self.restore()
             return
-        if not self.ready:
-            self.enable()
-        else:
-            try:
-                path, identity = self.discover()
-            except Exception:
-                self.ready = False  # A re-enumerated device needs a fresh activation.
-                raise
-            if identity != self.snapshot['identity']:
-                raise SuiteError('device_changed')
-            # InputPlumber recreates the original output after boot/session changes.
-            # Recognize that reset; unrelated live changes still fail closed in apply().
-            original = copy.deepcopy(self.snapshot['original_profile'])
-            original.pop('target_devices', None)
-            actual = self.profile(path)
-            actual.pop('target_devices', None)
-            if (self.targets(path) == self.snapshot['original_targets']
-                    and canonical(actual) == canonical(original)):
-                self.enable()
-        self.apply(rules)
-
-    def apply(self, rules):
-        snap = self.snapshot
-        if not snap or not snap.get('active'):
-            raise SuiteError('management_disabled')
-        if snap.get('paused'):
-            raise SuiteError(snap.get('error') or 'management_disabled')
-        path, identity = self.discover()
-        if identity != snap['identity']:
-            raise SuiteError('device_changed')
-        actual = self.profile(path)
-        if self.targets(path) != snap['targets'] or canonical(actual) != canonical(snap['expected_profile']):
-            snap['paused'] = True
-            snap['error'] = 'external_change'
-            self.persist()
-            raise SuiteError('external_change')
-        desired = compile_profile(snap['original_profile'], rules)
-        if canonical(actual) == canonical(desired):
-            return
-        # Only sources advertised by the selected embedded composite may be remapped.
+        path = self.checked_device()
+        base, defaults = system_defaults()
+        gamepads = {'xb360', 'gamepad', 'xbox-series', 'xbox-elite', 'ds5', 'ds5-edge',
+                    'deck', 'deck-uhid', 'hori-steam', '8bitdo-u2', 'steam-deck'}
+        if len([t for t in defaults if t in gamepads]) != 1:
+            raise SuiteError('unknown_targets')
+        targets = sorted([t for t in defaults if t not in gamepads] + ['xbox-elite'])
+        supported = self.bus.property(ROOT + '/Manager', 'org.shadowblip.InputManager', 'SupportedTargetDeviceIds')
+        if 'xbox-elite' not in supported:
+            raise SuiteError('elite_unavailable')
+        if any(t not in supported for t in targets):
+            raise SuiteError('unknown_targets')
         capabilities = self.bus.property(path, IFACE, 'Capabilities')
         if any('Gamepad:Button:' + BUTTONS[key] not in capabilities for key in rules):
             raise SuiteError('source_unavailable')
-        try:
-            actual = self.load(path, desired)
-            if self.targets(path) != snap['targets']:
+        desired = compile_profile(base, rules)
+        actual, current = self.profile(path), self.targets(path)
+        # While running, do not fight an unrelated manager. A real system reset
+        # is recognizable without any historical snapshot.
+        if self.ready and not (current == self.expected_targets and canonical(actual) == canonical(self.expected_profile)):
+            if not (current == defaults and canonical(actual.get('mapping', [])) == canonical(base['mapping'])):
                 raise SuiteError('external_change')
-            snap['expected_profile'] = actual
-            self.persist()
-        except Exception as exc:
-            snap['paused'] = True
-            snap['error'] = str(exc) if isinstance(exc, SuiteError) else 'operation_failed'
-            self.persist()
-            raise
+        self.set_targets(path, targets)
+        if canonical(actual) != canonical(desired):
+            actual = self.load(path, desired)
+        if self.targets(path) != targets:
+            raise SuiteError('readback_failed')
+        self.expected_targets, self.expected_profile, self.ready = targets, actual, True
 
     def restore(self):
-        if not self.snapshot or not self.snapshot.get('active'):
-            return
-        path, identity = self.discover()
-        snap = self.snapshot
-        if identity != snap['identity']:
-            raise SuiteError('device_changed')
-        # Explicit user restore, not an automatic overwrite of someone else's state.
-        original = copy.deepcopy(snap['original_profile'])
-        original.pop('target_devices', None)
-        self.set_targets(path, snap['original_targets'])
-        self.load(path, original)
-        if self.targets(path) != snap['original_targets']:
+        """Apply installed system defaults, even when no legacy snapshot exists."""
+        path = self.checked_device()
+        profile, targets = system_defaults()
+        supported = self.bus.property(ROOT + '/Manager', 'org.shadowblip.InputManager', 'SupportedTargetDeviceIds')
+        if any(t not in supported for t in targets):
+            raise SuiteError('unknown_targets')
+        self.set_targets(path, targets)
+        self.load(path, profile)
+        if self.targets(path) != targets:
             raise SuiteError('readback_failed')
-        snap['active'] = False
-        snap['paused'] = False
-        self.persist()
+        self.restore_pending = False
+        self.persist_preference()
         self.ready = False
+        self.expected_targets = self.expected_profile = None
 
 
 def canonical(value):

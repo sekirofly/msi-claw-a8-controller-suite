@@ -2,6 +2,7 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch
 import zipfile
@@ -17,6 +18,9 @@ class InstallerTests(unittest.TestCase):
         self.target.mkdir(parents=True)
         (self.target / 'plugin.json').write_text(json.dumps({'name': installer.NAME}))
         (self.target / 'old.txt').write_text('old')
+        (self.target / 'recover.py').write_text('# fixture')
+        runner = patch.object(installer.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '', ''))
+        runner.start(); self.addCleanup(runner.stop)
         self.other = self.home / 'plugins' / 'OtherPlugin'
         self.other.mkdir()
         (self.other / 'keep.txt').write_text('keep')
@@ -130,20 +134,25 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((self.target / 'old.txt').read_text(), 'old')
         self.assertEqual(len(list((self.home / ('.'+installer.FOLDER+'-recovery')).glob('*.json'))), 1)
 
-    def test_unconfirmed_recovery_only_warns_when_installing(self):
-        # An install must not be blocked by a restore that cannot be confirmed:
-        # that leaves the user unable to update or repair anything.
-        snapshot = self.active_snapshot()
-        with patch.object(installer.subprocess, 'run', side_effect=RuntimeError('offline')):
-            installer.restore_before_removal(self.home, fatal=False)
-        self.assertTrue(json.loads(snapshot.read_text())['active'])
-        self.assertEqual((self.target / 'old.txt').read_text(), 'old')
+    def test_uninstall_failed_default_restore_preserves_installation_without_snapshot(self):
+        with patch.object(installer, 'service'), patch.object(installer.subprocess, 'run',
+                return_value=subprocess.CompletedProcess([], 1, '', 'defaults missing')):
+            with self.assertRaisesRegex(ValueError, 'defaults missing'):
+                installer.transact(self.home, 'uninstall')
+        self.assertTrue((self.target / 'old.txt').exists())
+
+    def test_uninstall_restores_even_without_legacy_snapshot(self):
+        with patch.object(installer, 'service'), patch.object(installer.subprocess, 'run',
+                return_value=subprocess.CompletedProcess([], 0, '', '')) as run:
+            installer.transact(self.home, 'uninstall')
+        run.assert_called_once()
+        self.assertFalse(self.target.exists())
 
     def test_recovery_precedes_delete_and_keeps_emergency_copy(self):
         snapshot = self.active_snapshot()
         def restore(*args, **kwargs):
             self.assertTrue((self.target / 'old.txt').exists())
-            snapshot.write_text('{"active":false}')
+            return subprocess.CompletedProcess([], 0, 'System defaults restored', '')
         with patch.object(installer, 'service'), patch.object(installer.subprocess, 'run', side_effect=restore):
             installer.transact(self.home, 'uninstall')
         self.assertFalse(snapshot.exists())
@@ -188,13 +197,14 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(json.loads(snapshot.read_text())['active'])
         self.assertTrue((self.target / 'plugin.json').exists())
 
-    def test_corrupt_snapshot_blocks_removal(self):
+    def test_corrupt_legacy_snapshot_does_not_block_uninstall(self):
         snapshot = self.active_snapshot()
-        snapshot.write_text('corrupt')
+        snapshot.write_text('corrupt legacy backup')
         with patch.object(installer, 'service'):
-            with self.assertRaises(ValueError): installer.transact(self.home, 'uninstall')
-        self.assertTrue(self.target.exists())
-        self.assertEqual(snapshot.read_text(), 'corrupt')
+            installer.transact(self.home, 'uninstall')
+        copies = list((self.home / ('.' + installer.FOLDER + '-recovery')).glob('*.json'))
+        self.assertEqual(copies[0].read_text(), 'corrupt legacy backup')
+        self.assertFalse(self.target.exists())
 
     def test_skip_restore_uninstall_keeps_emergency_snapshot(self):
         snapshot = self.active_snapshot()
@@ -205,7 +215,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(len(copies), 1)
         self.assertEqual(copies[0].read_bytes(), original)
 
-    def test_reinstall_retains_active_recovery_and_preference(self):
+    def test_reinstall_archives_legacy_backup_and_retains_preference(self):
         for skip in (False, True):
             with self.subTest(skip=skip):
                 settings = self.home / 'settings' / installer.FOLDER
@@ -219,10 +229,12 @@ class InstallerTests(unittest.TestCase):
                 staged.mkdir()
                 (staged / 'plugin.json').write_text(json.dumps({'name': installer.NAME}))
                 with patch.object(installer, 'service'), patch.object(installer.os, 'chown'), \
-                     patch.object(installer.subprocess, 'run', side_effect=RuntimeError('offline')), \
-                     patch('time.sleep'):
+                     patch.object(installer.subprocess, 'run') as run:
                     installer.transact(self.home, 'reinstall', staged, skip_restore=skip)
-                self.assertEqual(json.loads((settings / 'recovery.json').read_text()), original)
+                run.assert_not_called()
+                self.assertFalse((settings / 'recovery.json').exists())
+                copies = list((self.home / ('.' + installer.FOLDER + '-recovery')).glob('*.json'))
+                self.assertTrue(any(json.loads(p.read_text()) == original for p in copies))
                 self.assertFalse(json.loads((settings / 'management.json').read_text())['enabled'])
                 self.assertFalse((settings / 'config.json').exists())
 

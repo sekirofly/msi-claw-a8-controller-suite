@@ -1,14 +1,14 @@
 # MSI Claw A8 Controller Suite
 
-Alpha.15 fixes recovery snapshot retention, backend shutdown and rumble-test races. A reinstall retains the original snapshot when restoration fails or is explicitly skipped; ordinary updates still replace plugin files only.
+Alpha.16 replaces historical snapshot restoration with installed system defaults. Management applies Elite and suite mappings; disabling restores the installed default profile and A8 targets.
 
-> Alpha.3 uses two persistent management choices: enabled by default on first installation, or explicitly disabled until you enable it again. Startup restores the suite state automatically and preserves the first original snapshot.
+> Fresh installs default to enabled. Explicit disable persists across reboot until enabled again. Restoration means system defaults, not another plugin’s or an earlier custom configuration.
 
 English | [简体中文](README.zh-CN.md)
 
 A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / BZ2EM)**, combining the hardware controls from [MSI Claw A8 Back Buttons & Rumble](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble) with selected InputPlumber integration inspired by [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber).
 
-**Status: v0.1.0-alpha.15 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
+**Status: v0.1.0-alpha.16 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
 
 ## Install / update the preview
 
@@ -16,13 +16,13 @@ A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / B
 2. In SteamOS Desktop Mode, open Konsole and run as your normal desktop user:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.15/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.16/install.sh | bash
 ```
 
 3. **Save work and reboot before returning to Gaming Mode.** If vibration remains unavailable after reboot, an EC reset may help; follow [MSI's official EC reset guidance](https://www.msi.com/support/technical_details/HH_EC_Reset). EC reset is not required routinely and is never automated.
-4. Open the suite, inspect device status, and first test rumble at a modest strength. Management starts enabled and applies automatically once the embedded A8 is identified. Test a simple M1 mapping, then test **Restore original configuration and disable**. This choice persists across reboot; **Enable management** resumes automatic management.
+4. Open the suite, inspect device status, and first test rumble at a modest strength. Management starts enabled and applies automatically once the embedded A8 is identified. Test a simple M1 mapping, then test **Restore system defaults and disable**. This choice persists across reboot; **Enable management** resumes automatic management.
 
-The installer checks the version-pinned ZIP and SHA-256 checksum, then briefly restarts Decky. It never restarts InputPlumber. A checksum detects corruption, not an independently signed release. Normal install/update retains button configurations but restores any active suite-managed InputPlumber state first, then resumes the saved enabled/disabled choice. Keyboard and mouse are useful while testing controller configuration.
+The installer checks the version-pinned ZIP and SHA-256 checksum, then briefly restarts Decky. It never restarts InputPlumber. A checksum detects corruption, not an independently signed release. Normal install/update retains configurations without restoring the controller first, then resumes the saved enabled/disabled choice. Keyboard and mouse are useful while testing controller configuration.
 
 No system Python changes are needed: pure-Python PyYAML is bundled. Unknown board/USB topology or missing InputPlumber APIs disables the affected operation instead of guessing another controller. Read [preview limitations](docs/implementation-status.md).
 
@@ -31,17 +31,19 @@ No system Python changes are needed: pure-Python PyYAML is bundled. Unknown boar
 The Maintenance page provides repair (same version, keep configurations), clean reinstall and clean uninstall. For a newer release, run that release's install command. Terminal alternatives:
 
 ```sh
-# Clean reinstall: restore input state, clear this suite's configurations, install again
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.15/install.sh | bash -s -- reinstall
+# Clean reinstall: clear mappings, retain enabled/disabled choice, install again
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.16/install.sh | bash -s -- reinstall
 # Clean uninstall
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.15/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.16/install.sh | bash -s -- uninstall
 # Offline clean uninstall using installed code
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```
 
 Default Decky home is `~/homebrew`. For a different location append `-s -- install --decky-home /absolute/homebrew` after `bash` (use the requested action instead of `install`). Do not launch the default command as root; that would choose `/root/homebrew`.
 
-An update or repair only stops Decky, replaces the plugin files and starts Decky again; the new version re-applies on start, so an update never calls InputPlumber at all. A clean reinstall or uninstall hands the controller back first, because the snapshot that records the pre-management state is about to be removed: the installer retries that restore three times, and for a clean reinstall a restore that still cannot be confirmed only warns. When restoration fails or is skipped, clean reinstall retains the active original snapshot and management preference while clearing mappings. A timestamped emergency snapshot is deliberately retained in `~/homebrew/.msi-claw-a8-controller-suite-recovery/`; shared Decky metadata and system journal are not deleted. Normal update retains configurations. Failed rollback retains its backup directory.
+Update/repair replaces files and restarts Decky while retaining all configuration. Clean reinstall clears mappings but retains the management choice. Neither restores the device first. Uninstall restores system defaults before removing files; failed restoration preserves the installation and reports the error. `--skip-restore` explicitly bypasses restoration.
+
+Defaults come from the installed `/usr/share/inputplumber/profiles/default.yaml` and `devices/50-msi_claw_a8_bz2e.yaml`. An existing `/usr/local/share/inputplumber` takes precedence, as upstream does. Third-party `/etc` overrides are not factory defaults. Missing or incompatible files stop device writes rather than guessing from a Steam display name; run `diagnostics.sh` for details. Old `recovery.json` files are retained only as legacy backups, archived under `~/homebrew/.msi-claw-a8-controller-suite-recovery/` before clean reinstall/uninstall. New installs create no snapshot.
 
 If a queued maintenance action does not complete, inspect:
 
@@ -98,4 +100,4 @@ python3 -m unittest discover -s tests -v
 
 Pure-Python PyYAML is bundled in the preview. The pip command above is for an isolated development environment, not SteamOS system Python. CI tests simulate controllers and do not validate actual A8 behavior.
 
-Terminal recovery is implemented in `recover.py`. On a manually provisioned development device, first stop this plugin's automatic callbacks, then invoke it with `sudo python3 /absolute/plugin/path/recover.py --settings-dir /absolute/DECKY_PLUGIN_SETTINGS_DIR`. Use the exact directory reported by Decky for this plugin, not a guessed slug. Preserve `recovery.json` until restoration is confirmed. Hardware back-button mode and rumble settings are not reset. Prefer the installer uninstall flow, which stops Decky before recovery. Do not delete the only recovery snapshot.
+Terminal recovery is implemented in `recover.py`. On a manually provisioned development device, first stop this plugin's automatic callbacks, then invoke it with `sudo python3 /absolute/plugin/path/recover.py --settings-dir /absolute/DECKY_PLUGIN_SETTINGS_DIR`. Use the exact directory reported by Decky for this plugin, not a guessed slug. Recovery requires the installed default files, not a saved snapshot. Hardware back-button mode and rumble settings are not reset. Prefer the installer uninstall flow, which stops Decky before recovery. Legacy snapshots are not used by this version.
