@@ -10,10 +10,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--settings-dir', required=True, type=Path)
     args = parser.parse_args()
-    snapshot = args.settings_dir / 'recovery.json'
-    if not snapshot.is_file():
-        raise SystemExit('No recovery snapshot found. No devices changed.')
-    ip = InputPlumber(Hardware(), snapshot)
+    ip = InputPlumber(Hardware(), args.settings_dir / 'management.json')
     ip.set_enabled(False)
     ip.restore()
-    print('Original InputPlumber profile and target devices restored. Hardware rumble and back-button mode were not reset.')
+    print('Installed system InputPlumber defaults restored. Hardware rumble and back-button mode were not reset.')

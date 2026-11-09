@@ -34,6 +34,7 @@ function errorText(code?: string): string {
     device_missing:['未找到已确认的内置控制接口','Verified embedded controls were not found'],
     device_ambiguous:['设备不唯一，已停止操作','Ambiguous device; operation blocked'],
     composite_ambiguous:['无法唯一确认内置 InputPlumber 设备','Cannot uniquely identify the embedded InputPlumber device'],
+    system_defaults_unavailable:['无法读取本机 A8 系统默认配置，未猜测替代配置；请运行诊断','Installed A8 system defaults are unavailable; run diagnostics'],
     interface_unavailable:['接口不可用，请查看诊断','Interface unavailable; check diagnostics'],
     yaml_missing:['需要系统 Python PyYAML','System Python PyYAML is required'],
     external_change:['手柄配置发生变化，请检查冲突后重试','Controller configuration changed. Check for conflicts and retry'],
@@ -122,7 +123,7 @@ function Header({c}: {c: Controller}) {
         +(c.state.managed?t('管理已启用','Management enabled'):t('管理已停用','Management disabled'))
       : t('正在读取…','Reading…')))}
     {c.state?.apply_error && <>
-      {row((c.state.managed?t('尚未生效：','Not applied: '):t('原配置尚未恢复：','Original configuration not yet restored: '))+errorText(c.state.apply_error))}
+      {row((c.state.managed?t('尚未生效：','Not applied: '):t('系统默认尚未恢复：','System defaults not yet restored: '))+errorText(c.state.apply_error))}
       <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>void c.run(()=>enqueue(()=>manage(c.state!.managed)))}>{t('重试','Retry')}</ButtonItem></PanelSectionRow>
     </>}
     {c.state?.hardware_error && row(errorText(c.state.hardware_error))}
@@ -310,24 +311,24 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
       <PanelSection title={t('插件管理','Plugin management')}>
         {row(s.managed
           ? t('管理已启用：接管内置手柄的输入输出（固定 Xbox Elite）并应用当前按键配置。','Management enabled: the embedded controller output (fixed Xbox Elite) and the current button configuration are managed.')
-          : t('管理已停用：手柄使用接管前的原始配置，插件不再自动应用按键。','Management disabled: the controller keeps its original configuration and no buttons are applied automatically.'))}
+          : t('管理已停用：插件不再自动应用按键。','Management disabled: suite mappings are no longer applied automatically.'))}
         {row(t('不影响外接手柄；不重置背键硬件模式和震动。','External controllers are unaffected; hardware back-button mode and rumble are not reset.'))}
         {s.inputplumber_error&&row(errorText(s.inputplumber_error))}
         {s.managed&&s.consistent===false&&row(t('检测到手柄的实际输出与套件期望不一致（可能被外部重置）。点“重试”重新应用，不会自动改写。','The controller output differs from what this suite expects, possibly after an external reset. Use Retry to re-apply; nothing is rewritten automatically.'))}
         <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>{
           if(!s.managed){void c.run(()=>enqueue(()=>manage(true)));return;}
-          confirm(t('恢复原配置并停用管理？','Restore the original configuration and disable management?'),
-            t('内置手柄的输出和按键映射将恢复为接管前的状态，之后不再自动应用。背键硬件模式和震动保持不变。','The embedded controller output and mappings return to their pre-management state and stop being applied. Hardware back-button mode and rumble stay unchanged.'),
+          confirm(t('恢复系统默认并停用管理？','Restore system defaults and disable management?'),
+            t('内置手柄的输出和按键映射将恢复为本机系统默认，不恢复旧插件的自定义配置。此后保持停用，直到再次启用。背键硬件模式和震动不变。','Restore the installed system defaults, not another plugin’s custom configuration. Management stays disabled until you enable it again. Hardware back-button mode and rumble stay unchanged.'),
             ()=>void c.run(()=>enqueue(()=>manage(false))));
-        }}>{s.managed?t('恢复原配置并停用','Restore original configuration and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
+        }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.15 · GPL-3.0-only')}
+        {row('0.1.0-alpha.16 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {row(t('恢复：先在上方插件管理停用管理。终端恢复和卸载方法见 README。','Recovery: disable management in the section above first. See README for terminal recovery and removal.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
           action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装当前版本','Repair current version'),
-          t('将短暂重启 Decky，并先恢复接管前的输入配置。修复保留按键配置；干净卸载/重装会清除它们。硬件震动与背键模式不重置。恢复失败时保留文件。','Decky restarts briefly. Original input state is restored first. Repair keeps button configurations; clean reinstall/uninstall clears them. Hardware settings are not reset. Files are preserved if restoration fails.'),
+          t('将短暂重启 Decky。修复保留配置；重装清除按键配置并保留启用选择；卸载先恢复系统默认。硬件震动与背键模式不重置。卸载恢复失败时保留文件。','Decky restarts briefly. Repair keeps settings; reinstall clears mappings and keeps the management choice; uninstall restores system defaults first. Hardware settings stay unchanged. Failed uninstall restoration preserves files.'),
           ()=>void c.run(()=>enqueue(()=>maintenance(action))))}>
           {action==='uninstall'?t('干净卸载','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装 · 保留配置','Repair installation · keep configurations')}
         </ButtonItem></PanelSectionRow>)}

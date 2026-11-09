@@ -50,7 +50,7 @@ class Plugin:
         if self.store is None:
             directory = Path(os.environ['DECKY_PLUGIN_SETTINGS_DIR'])
             store = Store(directory / 'config.json')
-            ip = InputPlumber(self.hardware, directory / 'recovery.json')
+            ip = InputPlumber(self.hardware, directory / 'management.json')
             self.store, self.ip = store, ip
 
     def trace(self, label, detail):
@@ -111,11 +111,10 @@ class Plugin:
                 state[key + '_error'] = str(exc) if isinstance(exc, SuiteError) else 'interface_unavailable'
         # Read-only drift check for the panel: report it, never fix it silently.
         try:
-            snapshot = self.ip.snapshot or {}
-            expected = snapshot.get('targets')
+            expected = self.ip.expected_targets
             actual = (state.get('inputplumber') or {}).get('targets')
-            state['consistent'] = (not self.ip.enabled) or (not snapshot.get('active')) \
-                or (expected is not None and actual == expected)
+            state['consistent'] = (not self.ip.enabled and not self.ip.restore_pending) or (
+                self.ip.enabled and self.ip.ready and expected is not None and actual == expected)
         except Exception:
             state['consistent'] = False
         try:
@@ -262,7 +261,7 @@ class Plugin:
         return await self.operation(schedule, 'maintenance')
 
     async def _unload(self):
-        # Updates/reloads must not reset hardware or destroy the recovery snapshot.
+        # Updates/reloads must not reset hardware or change the saved management choice.
         self.stopping.set()
         # Wait briefly for an in-flight device write, but never block shutdown:
         # Decky kills a plugin that is still alive five seconds after the request.

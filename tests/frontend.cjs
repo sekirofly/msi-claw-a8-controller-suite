@@ -78,7 +78,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       const retry=settings.root.findAllByType('ButtonItem').find(x=>['重试','Retry'].includes(x.props.children));
       await act(async()=>{await retry.props.onClick();await new Promise(r=>setTimeout(r,10))});
       assert.deepEqual(calls.filter(x=>x[0]==='set_management').at(-1),['set_management',true]);
-      const disable=settings.root.findAllByType('ButtonItem').find(x=>String(x.props.children).includes(language==='zh-CN'?'恢复原配置':'Restore original'));
+      const disable=settings.root.findAllByType('ButtonItem').find(x=>String(x.props.children).includes(language==='zh-CN'?'恢复系统默认':'Restore system defaults'));
       await act(async()=>{await disable.props.onClick();await new Promise(r=>setTimeout(r,10))});
       assert.deepEqual(calls.filter(x=>x[0]==='set_management').at(-1),['set_management',false]);
       assert.match(JSON.stringify(settings.toJSON()),language==='zh-CN'?/启用管理/:/Enable management/);
@@ -90,7 +90,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
         await act(async()=>{device=create(pages[1].content)});
         const deviceText=JSON.stringify(device.toJSON());
         assert.match(deviceText,language==='zh-CN'?/背键硬件模式/:/Back-button hardware mode/);
-        assert.doesNotMatch(deviceText,language==='zh-CN'?/恢复原配置/:/Restore original/);
+        assert.doesNotMatch(deviceText,language==='zh-CN'?/恢复系统默认/:/Restore system defaults/);
       } finally {await act(async()=>{device?.unmount()});}
       for(const pageIndex of [0]) {
         let editor;const focused=[];

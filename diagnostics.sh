@@ -24,3 +24,12 @@ for d in /sys/class/hidraw/*/device; do
     cat "$d/mkeys_function" "$d/rumble_intensity_left" "$d/rumble_intensity_right"
   fi
 done
+echo '=== Installed system defaults (read-only) ==='
+for base in /usr/local/share/inputplumber /usr/share/inputplumber; do
+  for file in "$base/profiles/default.yaml" "$base/devices/50-msi_claw_a8_bz2e.yaml"; do
+    if [ -f "$file" ]; then
+      echo "$file"
+      cat "$file"
+    fi
+  done
+done
