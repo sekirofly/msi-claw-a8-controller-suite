@@ -1,9 +1,12 @@
 """Capability-gated D-Bus adapter. No service restarts or positional selection."""
 import copy
 import json
+import logging
 import subprocess
 import time
 from .config import SuiteError, atomic_json, compile_profile, BUTTONS
+
+log = logging.getLogger('msi-claw-a8-controller-suite')
 
 SERVICE = 'org.shadowblip.InputPlumber'
 IFACE = 'org.shadowblip.Input.CompositeDevice'
@@ -123,14 +126,25 @@ class InputPlumber:
                 'sources': [key for key, value in BUTTONS.items()
                             if 'Gamepad:Button:' + value in capabilities]}
 
-    def set_targets(self, path, values, confirm=True, timeout=4.0):
-        """Set the target set; confirm reads it back when the caller needs proof."""
+    def set_targets(self, path, values, confirm=True, timeout=10.0):
+        """Set the target set; confirm reads it back when the caller needs proof.
+
+        Calling SetTargetDevices makes InputPlumber tear down and rebuild every
+        target object, so it is never called for a set that is already in place:
+        an unnecessary call starts a rebuild whose transient state makes the
+        read-back fail, and a retry then restarts that rebuild again.
+        """
+        wanted = sorted(values)
+        if self.targets(path) == wanted:
+            return True
         self.bus.call(path, IFACE, 'SetTargetDevices', 'as', len(values), *values)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if self.targets(path) == sorted(values):
+            if self.targets(path) == wanted:
                 return True
             time.sleep(.1)
+        actual = self.targets(path)
+        log.warning('SetTargetDevices wanted %s, read back %s', wanted, actual)
         if confirm:
             raise SuiteError('readback_failed')
         return False
