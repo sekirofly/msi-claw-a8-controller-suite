@@ -1,5 +1,12 @@
 # Initial implementation status
 
+## Alpha.13: the restore no longer restarts its own rebuild
+
+- ``set_targets`` returns immediately when the target set already matches. Every ``SetTargetDevices`` call makes InputPlumber tear down and rebuild all target objects; writing an already-correct set started a rebuild the read-back then failed on, and the installer's retry restarted that rebuild, so the restore could never settle.
+- The read-back window is 10 seconds (was 4), still exact-match.
+- A mismatch logs the wanted and actual sets, so the journal names the difference instead of only ``readback_failed``.
+- ``install`` and ``reinstall`` no longer print the restore warning on this path; ``uninstall`` keeps the fail-closed behaviour.
+
 ## Alpha.12: the rumble test actually runs, and the poll is gone
 
 - ``enqueue`` forwarded the previous promise value into the callable it ran, so ``test_rumble`` was invoked as ``test_rumble(undefined)``. Python raised ``takes 1 positional argument but 2 were given`` before the method body ran; Decky surfaced it only as "Python Exception". ``enqueue`` now calls with no arguments and the call site wraps the zero-argument callable.
@@ -59,7 +66,7 @@ Editor entry explicitly focuses the copy-source control; returning restores the 
 
 The UI has two management choices: enabled and disabled. Fresh installs default to enabled; the backend reconciles without requiring an open panel. Boot and recognized original-state resets reapply Elite and selected mappings. Explicit disable persists before restoration, so failed recovery never re-enables on reboot; recovery errors remain visible with retry. Re-enabling preserves the first snapshot. Updates/repair preserve the choice; clean reinstall resets settings. Legacy active/paused snapshots migrate to enabled; legacy restored snapshots migrate to disabled. Unrelated live changes still stop writes and offer retry rather than requiring restore then enable. Device identity and capability gates remain enforced. Hardware validation is still required.
 
-2026-11-08, preview version 0.1.0-alpha.12. An installer is available for A8 testing; this is not a stable or device-validated release.
+2026-11-08, preview version 0.1.0-alpha.13. An installer is available for A8 testing; this is not a stable or device-validated release.
 
 Implemented: independent versioned default/game/template storage; strict embedded A8 discovery; serialized sysfs writes; finite 500 ms physical-device rumble test; capability-gated InputPlumber discovery, fixed Elite activation, durable recovery snapshot and terminal restore; English/Chinese quick panel and settings pages; independent copying and per-game selection; explicit save-versus-apply error handling.
 

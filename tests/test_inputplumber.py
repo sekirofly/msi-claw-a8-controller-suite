@@ -202,6 +202,15 @@ class InputTests(unittest.TestCase):
         self.ip.apply({'M1':['A']});self.ip.apply({'M1':['B']})
         self.assertFalse(any(name=='SetTargetDevices' for _,name in self.bus.calls))
 
+    def test_unchanged_targets_are_not_rewritten(self):
+        # SetTargetDevices tears down and rebuilds every target object, so an
+        # already-correct set must not be written again: the rebuild itself makes
+        # the read-back fail, and a retry would restart the rebuild.
+        self.ip.enable()
+        self.bus.calls.clear()
+        self.assertTrue(self.ip.set_targets('/compositeA8', self.bus.target))
+        self.assertEqual(self.bus.calls, [])
+
     def test_disappearing_target_object_is_skipped(self):
         # InputPlumber can drop a target object between listing it and reading
         # its type; that must not fail targets() and, with it, a restore.
