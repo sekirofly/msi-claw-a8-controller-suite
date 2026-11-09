@@ -1,5 +1,13 @@
 # Initial implementation status
 
+## Alpha.18: remove redundant headings and copy
+
+- The outer navigation alone displays the plugin title. The quick panel starts with its current-button summary, without repeating the normal management state or device scope.
+- The entire summary remains one focus stop; its text lines are not independently focusable. Top scrolling is unchanged.
+- Remove repeated configuration headings and current-mode text. State shared hardware scope once per page; selected mode indicators remain.
+- Management status/scope lives in Maintenance. Loading, errors and retry remain visible; disabled mapping editors explain that edits are saved for later activation.
+- Chinese/English component and browser checks; native Steam navigation still needs hardware confirmation.
+
 ## Alpha.17: quick-panel clarity and focus scrolling
 
 - Combine applied scope into “Current buttons: Default buttons / game configuration”. Show a game name only when available and distinguish initial game-state loading from no running game.
