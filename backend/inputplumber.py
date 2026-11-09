@@ -20,8 +20,15 @@ def yaml_module():
 
 class Bus:
     def run(self, *args):
-        result = subprocess.run(['busctl', '--system', '--timeout=3', '--json=short', *args],
-                                capture_output=True, text=True, timeout=5, check=True)
+        # busctl exits non-zero when an object path disappears mid-transition,
+        # which happens while InputPlumber rebuilds its target devices. Report
+        # it as a SuiteError so callers can retry instead of dying on a
+        # CalledProcessError traceback.
+        try:
+            result = subprocess.run(['busctl', '--system', '--timeout=3', '--json=short', *args],
+                                    capture_output=True, text=True, timeout=5, check=True)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
+            raise SuiteError('interface_unavailable') from exc
         return json.loads(result.stdout) if result.stdout.strip() else None
 
     def property(self, path, interface, name):
@@ -96,8 +103,16 @@ class InputPlumber:
         return profile
 
     def targets(self, path):
-        paths = self.bus.property(path, IFACE, 'TargetDevices')
-        return sorted(self.bus.property(p, 'org.shadowblip.Input.Target', 'DeviceType') for p in paths)
+        # A target object can vanish between listing and reading its type while
+        # InputPlumber rebuilds devices; skip it and let the caller retry rather
+        # than failing the whole read (and with it a restore or an install).
+        result = []
+        for target in self.bus.property(path, IFACE, 'TargetDevices'):
+            try:
+                result.append(self.bus.property(target, 'org.shadowblip.Input.Target', 'DeviceType'))
+            except SuiteError:
+                continue
+        return sorted(result)
 
     def status(self):
         path, identity = self.discover()

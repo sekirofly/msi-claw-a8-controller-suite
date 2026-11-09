@@ -15,7 +15,7 @@ import urllib.error
 import time
 import zipfile
 
-VERSION = "0.1.0-alpha.9"
+VERSION = "0.1.0-alpha.10"
 REPO = "https://github.com/sekirofly/msi-claw-a8-controller-suite"
 NAME = "MSI Claw A8 Controller Suite"
 FOLDER = "msi-claw-a8-controller-suite"
@@ -126,7 +126,7 @@ def service(action):
     subprocess.run(["systemctl", action, SERVICE], check=True, timeout=60)
 
 
-def restore_before_removal(home, staged=None):
+def restore_before_removal(home, staged=None, skip=False):
     """Called only after Decky is stopped. Fail before moving/deleting any files."""
     settings = home / 'settings' / FOLDER
     snapshot = settings / 'recovery.json'
@@ -136,6 +136,9 @@ def restore_before_removal(home, staged=None):
         raise ValueError('Refusing symlink recovery snapshot')
     data = json.loads(snapshot.read_text(encoding='utf-8'))
     if not data.get('active'):
+        return
+    if skip:
+        print('WARNING: skipping restoration of the original controller state on request (--skip-restore).')
         return
     recovery_dir = home / ('.' + FOLDER + '-recovery')
     if recovery_dir.is_symlink():
@@ -148,12 +151,27 @@ def restore_before_removal(home, staged=None):
     preference = settings / 'management.json'
     enabled = json.loads(preference.read_text())['enabled'] if preference.exists() else True
     target = home / 'plugins' / FOLDER
-    helper_root = target if (target / 'recover.py').is_file() else staged
-    if helper_root is None:
+    # Prefer the freshly unpacked code: an installed version can carry a bug that
+    # makes recovery impossible, which would otherwise deadlock every reinstall.
+    helper_root = staged if (staged is not None and (staged / 'recover.py').is_file()) else target
+    if not (helper_root / 'recover.py').is_file():
         raise ValueError('Active recovery snapshot exists but recovery code is missing; files preserved')
     try:
-        subprocess.run(['python3', str(helper_root / 'recover.py'), '--settings-dir', str(settings)],
-                       check=True, timeout=90)
+        last_error = None
+        for attempt in range(2):
+            result = subprocess.run(['python3', str(helper_root / 'recover.py'), '--settings-dir', str(settings)],
+                                    capture_output=True, text=True, timeout=90)
+            if result.returncode == 0:
+                last_error = None
+                break
+            last_error = (result.stderr or result.stdout or '').strip()
+            # InputPlumber rebuilds target objects while switching; one retry
+            # covers a transient disappearing object path.
+            time.sleep(2)
+        if last_error is not None:
+            raise ValueError('Restoring the original controller state failed; files and snapshot preserved. '
+                             'Retry the install, or use --skip-restore if the controller must be left as is.\n'
+                             + last_error[-800:])
         if json.loads(snapshot.read_text(encoding='utf-8')).get('active'):
             raise ValueError('Recovery did not complete; files preserved')
     finally:
@@ -166,7 +184,7 @@ def restore_before_removal(home, staged=None):
         os.replace(temporary, preference)
 
 
-def transact(home, action, staged=None):
+def transact(home, action, staged=None, skip_restore=False):
     """Move only this plugin's directories; roll back if service restart fails."""
     home = validate_home(home)
     target = home / 'plugins' / FOLDER
@@ -181,7 +199,7 @@ def transact(home, action, staged=None):
     try:
         service('stop')
         stopped = True
-        restore_before_removal(home, staged)
+        restore_before_removal(home, staged, skip=skip_restore)
         for index, path in enumerate(paths):
             if path.exists():
                 saved = backup / str(index)
@@ -222,10 +240,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['install', 'reinstall', 'uninstall'], nargs='?', default='install')
     parser.add_argument('--decky-home', default=str(Path.home() / 'homebrew'))
+    parser.add_argument('--skip-restore', action='store_true',
+                        help='do not restore the pre-management controller state before replacing or removing files')
     args = parser.parse_args()
     home = validate_home(args.decky_home)
     if os.geteuid() != 0:
-        os.execvp('sudo', ['sudo', 'python3', str(Path(__file__).resolve()), args.action, '--decky-home', str(home)])
+        extra = ['--skip-restore'] if args.skip_restore else []
+        os.execvp('sudo', ['sudo', 'python3', str(Path(__file__).resolve()), args.action,
+                            '--decky-home', str(home), *extra])
     import fcntl
     with open('/run/msi-claw-a8-controller-suite.lock', 'w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -238,7 +260,7 @@ def main():
                 if len(expected) != 64 or hashlib.sha256(data).hexdigest() != expected:
                     raise ValueError('Release checksum mismatch; existing installation unchanged')
                 staged = unpack(data, Path(directory))
-            transact(home, args.action, staged)
+            transact(home, args.action, staged, skip_restore=args.skip_restore)
     print('MSI Claw A8 Controller Suite: ' + args.action + ' complete. Hardware settings unchanged.')
     print('Preview release: disable/remove the original DeckyPlumber and Back Buttons & Rumble plugins before enabling management. Existing suite button configurations are kept on install/update; clean reinstall/uninstall removes them after recovery.')
     print('IMPORTANT: Save your work and reboot normally before returning to Gaming Mode. Controller detection after a live Decky restart is not reliable on the tested A8.')
