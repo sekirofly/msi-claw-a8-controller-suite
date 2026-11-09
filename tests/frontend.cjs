@@ -20,7 +20,8 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
   const api={definePlugin:f=>f,routerHook:{addRoute:(_,f)=>{factory=f},removeRoute(){}},callable:name=>async(...args)=>{
     calls.push([name,...args]);
     if(name==='set_hardware') {await new Promise(r=>{release=r});hardware.left=args[1];hardware.right=args[2];return {ok:true,data:hardware};}
-    if(name==='get_state')return {ok:true,data:state};
+    if(name==='get_state')return {ok:true,data:JSON.parse(JSON.stringify(state))};
+    if(name==='set_management') {state.managed=args[0];state.apply_error=null;return {ok:true,data:state};}
     return {ok:true,data:true};
   }};
   const filename=path.resolve('src/index.tsx');
@@ -42,5 +43,23 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     await act(async()=>{release();await new Promise(r=>setTimeout(r,10))});
     assert.equal(calls.filter(x=>x[0]==='test_rumble').length,1);
     assert.ok(factory);
+    // An enabled-but-not-applied preference has a retry action, not a restore prerequisite.
+    state.apply_error='external_change';state.applied=null;
+    let navigation,settings;
+    try {
+      await act(async()=>{navigation=create(factory())});
+      const hardwarePage=navigation.root.findByType('SidebarNavigation').props.pages[2].content;
+      await act(async()=>{settings=create(hardwarePage)});
+      const text=JSON.stringify(settings.toJSON());
+      assert.doesNotMatch(text,/请恢复后重新启用|Restore before enabling again/);
+      assert.match(text,language==='zh-CN'?/尚未生效/:/Not applied/);
+      const retry=settings.root.findAllByType('ButtonItem').find(x=>['重试','Retry'].includes(x.props.children));
+      await act(async()=>{await retry.props.onClick();await new Promise(r=>setTimeout(r,10))});
+      assert.deepEqual(calls.filter(x=>x[0]==='set_management').at(-1),['set_management',true]);
+      const disable=settings.root.findAllByType('ButtonItem').find(x=>String(x.props.children).includes(language==='zh-CN'?'恢复原配置':'Restore original'));
+      await act(async()=>{await disable.props.onClick();await new Promise(r=>setTimeout(r,10))});
+      assert.deepEqual(calls.filter(x=>x[0]==='set_management').at(-1),['set_management',false]);
+      assert.match(JSON.stringify(settings.toJSON()),language==='zh-CN'?/启用管理/:/Enable management/);
+    } finally {await act(async()=>{settings?.unmount();navigation?.unmount()});}
   } finally {await act(async()=>rendered?.unmount());plugin.onDismount();}
 });

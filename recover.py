@@ -13,5 +13,7 @@ if __name__ == '__main__':
     snapshot = args.settings_dir / 'recovery.json'
     if not snapshot.is_file():
         raise SystemExit('No recovery snapshot found. No devices changed.')
-    InputPlumber(Hardware(), snapshot).restore()
+    ip = InputPlumber(Hardware(), snapshot)
+    ip.set_enabled(False)
+    ip.restore()
     print('Original InputPlumber profile and target devices restored. Hardware rumble and back-button mode were not reset.')

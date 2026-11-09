@@ -151,6 +151,20 @@ class InstallerTests(unittest.TestCase):
             installer.transact(self.home, 'install', staged)
         self.assertEqual((snapshot.parent / 'config.json').read_text(), '{"keep":"config"}')
         self.assertFalse(json.loads(snapshot.read_text())['active'])
+        self.assertTrue(json.loads((snapshot.parent / 'management.json').read_text())['enabled'])
+
+    def test_failed_update_restoration_preserves_disabled_preference(self):
+        snapshot = self.active_snapshot()
+        preference = snapshot.parent / 'management.json'
+        preference.write_text('{"enabled":false}')
+        def fail(*args, **kwargs):
+            preference.write_text('{"enabled":false}')
+            raise RuntimeError('device offline')
+        with patch.object(installer, 'service'), patch.object(installer.subprocess, 'run', side_effect=fail):
+            with self.assertRaises(RuntimeError):
+                installer.transact(self.home, 'install')
+        self.assertFalse(json.loads(preference.read_text())['enabled'])
+        self.assertTrue(json.loads(snapshot.read_text())['active'])
 
     def test_corrupt_snapshot_blocks_removal(self):
         snapshot = self.active_snapshot()

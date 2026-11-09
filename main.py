@@ -29,6 +29,7 @@ class Plugin:
         self.apply_error = None
         self.last_test = 0.0
         self.maintaining = False
+        self.stopping = asyncio.Event()
 
     def setup(self):
         if self.store is None:
@@ -61,8 +62,7 @@ class Plugin:
     def status(self):
         state = {'config': self.store.snapshot(), 'game': self.game, 'game_name': self.game_name,
                  'applied': self.applied, 'apply_error': self.apply_error,
-                 'managed': bool(self.ip.snapshot and self.ip.snapshot.get('active')),
-                 'paused': bool(self.ip.snapshot and self.ip.snapshot.get('paused'))}
+                 'managed': self.ip.enabled}
         for key, call in [('hardware', self.hardware.state), ('inputplumber', self.ip.status)]:
             try:
                 state[key] = call()
@@ -78,17 +78,12 @@ class Plugin:
         return await self.operation(self.status)
 
     def apply_selected(self):
-        if self.game is None:
-            self.apply_error = 'game_unknown'
-            return
-        if not self.ip.snapshot or not self.ip.snapshot.get('active'):
-            self.applied = None
-            self.apply_error = None
-            return
-        scope, rules = self.store.selected(self.game)
+        # Before Steam reports a game, establish the default configuration. Later
+        # unknown reports retain the last known game rather than switching away.
+        scope, rules = self.store.selected(self.game or 'default')
         try:
-            self.ip.apply(rules)
-            self.applied = scope
+            self.ip.reconcile(rules)
+            self.applied = scope if self.ip.enabled else None
             self.apply_error = None
         except Exception as exc:
             self.applied = None
@@ -103,8 +98,10 @@ class Plugin:
                 return {'ok': False, 'error': 'invalid_game'}
         if not isinstance(name, str) or len(name) > 160:
             return {'ok': False, 'error': 'invalid_game'}
-        self.game, self.game_name = game_id, name
         def update():
+            if game_id is None:
+                return {'applied': self.applied, 'apply_error': self.apply_error}
+            self.game, self.game_name = game_id, name
             self.apply_selected()
             return {'applied': self.applied, 'apply_error': self.apply_error}
         return await self.operation(update)
@@ -142,19 +139,22 @@ class Plugin:
         def change():
             if type(enabled) is not bool:
                 raise SuiteError('invalid_rules')
-            if enabled:
-                self.ip.enable()
-                self.apply_selected()
-            else:
-                self.ip.restore()
-                self.applied = None
-                self.apply_error = None
+            # Persist intent before touching hardware. A failed restore must never
+            # cause a reboot to silently re-enable management.
+            self.ip.set_enabled(enabled)
+            self.ip.ready = False
+            self.apply_selected()
             return self.status()
         return await self.operation(change)
 
     async def _main(self):
-        # Explicit activation is required. Reading the panel never activates it.
-        pass
+        # Independent of the panel/frontend: late devices, reboot and wake recover.
+        while not self.stopping.is_set():
+            await self.operation(self.apply_selected)
+            try:
+                await asyncio.wait_for(self.stopping.wait(), timeout=5)
+            except asyncio.TimeoutError:
+                pass
 
     async def maintenance(self, action):
         def schedule():
@@ -189,5 +189,6 @@ class Plugin:
 
     async def _unload(self):
         # Updates/reloads must not reset hardware or destroy the recovery snapshot.
+        self.stopping.set()
         async with self.lock:
             pass

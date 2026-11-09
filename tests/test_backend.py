@@ -12,7 +12,7 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.plugin=Plugin();self.plugin.store=Store(Path(self.tmp.name)/'config.json')
         self.applied=[]
-        self.plugin.ip=SimpleNamespace(snapshot={'active':True},apply=lambda rules:self.applied.append(rules))
+        self.plugin.ip=SimpleNamespace(enabled=True, reconcile=lambda rules:self.applied.append(rules))
         self.plugin.status=lambda:{'config':self.plugin.store.snapshot(),'apply_error':self.plugin.apply_error}
 
     async def test_saving_inactive_game_does_not_apply_its_rules(self):
@@ -25,7 +25,7 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
     async def test_save_survives_apply_failure(self):
         self.plugin.game='1'
         def fail(rules):raise RuntimeError('offline')
-        self.plugin.ip.apply=fail
+        self.plugin.ip.reconcile=fail
         result=await self.plugin.save_config('1','Game',{'M1':['A']},True,0)
         self.assertTrue(result['ok'])
         self.assertEqual(result['data']['apply_error'],'operation_failed')
@@ -42,3 +42,19 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         def first():order.append('start');time.sleep(.03);order.append('end')
         await asyncio.gather(self.plugin.operation(first),self.plugin.operation(lambda:order.append('second')))
         self.assertEqual(order,['start','end','second'])
+
+    async def test_backend_starts_without_frontend_and_unloads(self):
+        task = asyncio.create_task(self.plugin._main())
+        for _ in range(50):
+            if self.applied:
+                break
+            await asyncio.sleep(.01)
+        await self.plugin._unload()
+        await asyncio.wait_for(task, 1)
+        self.assertEqual(self.applied, [{}])
+
+    async def test_unknown_report_retains_known_game(self):
+        await self.plugin.report_game('12', 'Game')
+        await self.plugin.report_game(None, '')
+        self.assertEqual(self.plugin.game, '12')
+        self.assertEqual(self.plugin.game_name, 'Game')
