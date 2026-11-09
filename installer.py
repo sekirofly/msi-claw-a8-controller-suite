@@ -15,7 +15,7 @@ import urllib.error
 import time
 import zipfile
 
-VERSION = "0.1.0-alpha.10"
+VERSION = "0.1.0-alpha.11"
 REPO = "https://github.com/sekirofly/msi-claw-a8-controller-suite"
 NAME = "MSI Claw A8 Controller Suite"
 FOLDER = "msi-claw-a8-controller-suite"
@@ -126,8 +126,13 @@ def service(action):
     subprocess.run(["systemctl", action, SERVICE], check=True, timeout=60)
 
 
-def restore_before_removal(home, staged=None, skip=False):
-    """Called only after Decky is stopped. Fail before moving/deleting any files."""
+def restore_before_removal(home, staged=None, skip=False, fatal=True):
+    """Called only after Decky is stopped. Fail before moving/deleting any files.
+
+    A restore that cannot be confirmed blocks uninstall (the plugin would be gone while
+    the controller stayed managed) but only warns for install and reinstall: refusing to
+    update leaves the user unable to fix anything.
+    """
     settings = home / 'settings' / FOLDER
     snapshot = settings / 'recovery.json'
     if not snapshot.exists():
@@ -158,24 +163,36 @@ def restore_before_removal(home, staged=None, skip=False):
         raise ValueError('Active recovery snapshot exists but recovery code is missing; files preserved')
     try:
         last_error = None
-        for attempt in range(2):
-            result = subprocess.run(['python3', str(helper_root / 'recover.py'), '--settings-dir', str(settings)],
-                                    capture_output=True, text=True, timeout=90)
-            # A mocked runner may return None; treat that as success, as the
-            # previous check=True call did.
-            if getattr(result, 'returncode', 0) == 0:
+        for attempt in range(3):
+            try:
+                result = subprocess.run(['python3', str(helper_root / 'recover.py'), '--settings-dir', str(settings)],
+                                        capture_output=True, text=True, timeout=90)
+                # A mocked runner may return None; treat that as success, as the
+                # previous check=True call did.
+                code = getattr(result, 'returncode', 0)
+                detail = ((getattr(result, 'stderr', '') or getattr(result, 'stdout', '') or '')).strip()
+            except Exception as exc:
+                if fatal:
+                    raise
+                code, detail = 1, '%s: %s' % (type(exc).__name__, exc)
+            if code == 0:
                 last_error = None
                 break
-            last_error = ((getattr(result, 'stderr', '') or getattr(result, 'stdout', '') or '')).strip()
-            # InputPlumber rebuilds target objects while switching; one retry
-            # covers a transient disappearing object path.
-            time.sleep(2)
+            last_error = detail
+            # InputPlumber rebuilds target objects while switching; a short retry
+            # covers a transient disappearing object path or a slow read-back.
+            time.sleep(1.5)
+        if last_error is None and json.loads(snapshot.read_text(encoding='utf-8')).get('active'):
+            last_error = 'Recovery did not complete; the snapshot is still marked active.'
         if last_error is not None:
-            raise ValueError('Restoring the original controller state failed; files and snapshot preserved. '
-                             'Retry the install, or use --skip-restore if the controller must be left as is.\n'
-                             + last_error[-800:])
-        if json.loads(snapshot.read_text(encoding='utf-8')).get('active'):
-            raise ValueError('Recovery did not complete; files preserved')
+            message = ('Restoring the original controller state failed; files and snapshot preserved. '
+                       'Retry the install, or use --skip-restore if the controller must be left as is.\n'
+                       + last_error[-800:])
+            if fatal:
+                raise ValueError(message)
+            print('WARNING: ' + message)
+            print('WARNING: continuing with the install. The controller may stay managed until it is '
+                  're-managed or restored from the retained snapshot.')
     finally:
         # Maintenance restoration is temporary, including a failed update rollback.
         temporary = preference.with_suffix('.tmp')
@@ -201,7 +218,7 @@ def transact(home, action, staged=None, skip_restore=False):
     try:
         service('stop')
         stopped = True
-        restore_before_removal(home, staged, skip=skip_restore)
+        restore_before_removal(home, staged, skip=skip_restore, fatal=(action == 'uninstall'))
         for index, path in enumerate(paths):
             if path.exists():
                 saved = backup / str(index)

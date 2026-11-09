@@ -130,6 +130,15 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((self.target / 'old.txt').read_text(), 'old')
         self.assertEqual(len(list((self.home / ('.'+installer.FOLDER+'-recovery')).glob('*.json'))), 1)
 
+    def test_unconfirmed_recovery_only_warns_when_installing(self):
+        # An install must not be blocked by a restore that cannot be confirmed:
+        # that leaves the user unable to update or repair anything.
+        snapshot = self.active_snapshot()
+        with patch.object(installer.subprocess, 'run', side_effect=RuntimeError('offline')):
+            installer.restore_before_removal(self.home, fatal=False)
+        self.assertTrue(json.loads(snapshot.read_text())['active'])
+        self.assertEqual((self.target / 'old.txt').read_text(), 'old')
+
     def test_recovery_precedes_delete_and_keeps_emergency_copy(self):
         snapshot = self.active_snapshot()
         def restore(*args, **kwargs):
