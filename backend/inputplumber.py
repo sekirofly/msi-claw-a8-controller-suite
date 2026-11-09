@@ -123,13 +123,17 @@ class InputPlumber:
                 'sources': [key for key, value in BUTTONS.items()
                             if 'Gamepad:Button:' + value in capabilities]}
 
-    def set_targets(self, path, values):
+    def set_targets(self, path, values, confirm=True, timeout=4.0):
+        """Set the target set; confirm reads it back when the caller needs proof."""
         self.bus.call(path, IFACE, 'SetTargetDevices', 'as', len(values), *values)
-        for _ in range(20):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
             if self.targets(path) == sorted(values):
-                return
+                return True
             time.sleep(.1)
-        raise SuiteError('readback_failed')
+        if confirm:
+            raise SuiteError('readback_failed')
+        return False
 
     def load(self, path, profile):
         self.bus.call(path, IFACE, 'LoadProfileFromYaml', 's', json.dumps(profile))

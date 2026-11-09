@@ -130,6 +130,15 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((self.target / 'old.txt').read_text(), 'old')
         self.assertEqual(len(list((self.home / ('.'+installer.FOLDER+'-recovery')).glob('*.json'))), 1)
 
+    def test_unconfirmed_recovery_only_warns_when_installing(self):
+        # An install must not be blocked by a restore that cannot be confirmed:
+        # that leaves the user unable to update or repair anything.
+        snapshot = self.active_snapshot()
+        with patch.object(installer.subprocess, 'run', side_effect=RuntimeError('offline')):
+            installer.restore_before_removal(self.home, fatal=False)
+        self.assertTrue(json.loads(snapshot.read_text())['active'])
+        self.assertEqual((self.target / 'old.txt').read_text(), 'old')
+
     def test_recovery_precedes_delete_and_keeps_emergency_copy(self):
         snapshot = self.active_snapshot()
         def restore(*args, **kwargs):
@@ -153,16 +162,21 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse(json.loads(snapshot.read_text())['active'])
         self.assertTrue(json.loads((snapshot.parent / 'management.json').read_text())['enabled'])
 
-    def test_failed_update_restoration_preserves_disabled_preference(self):
+    def test_failed_update_restoration_warns_and_preserves_disabled_preference(self):
+        # An update warns instead of aborting when the restore cannot be
+        # confirmed, but the explicit disabled choice and the snapshot survive.
         snapshot = self.active_snapshot()
         preference = snapshot.parent / 'management.json'
         preference.write_text('{"enabled":false}')
         def fail(*args, **kwargs):
             preference.write_text('{"enabled":false}')
             raise RuntimeError('device offline')
-        with patch.object(installer, 'service'), patch.object(installer.subprocess, 'run', side_effect=fail):
-            with self.assertRaises(RuntimeError):
-                installer.transact(self.home, 'install')
+        staged = self.home / 'stage'
+        staged.mkdir()
+        (staged / 'plugin.json').write_text(json.dumps({'name': installer.NAME}))
+        with patch.object(installer, 'service'), patch.object(installer.subprocess, 'run', side_effect=fail), \
+             patch.object(installer.os, 'chown', create=True):
+            installer.transact(self.home, 'install', staged)
         self.assertFalse(json.loads(preference.read_text())['enabled'])
         self.assertTrue(json.loads(snapshot.read_text())['active'])
 

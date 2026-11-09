@@ -1,5 +1,12 @@
 # Initial implementation status
 
+## Alpha.11: an unconfirmed restore no longer blocks installs
+
+- ``set_targets`` waits four seconds for the read-back and can run unconfirmed, so a slow InputPlumber transition no longer fails immediately.
+- The installer retries restoration three times, and treats a restore that still cannot be confirmed as a warning for ``install`` and ``reinstall``. Refusing to update left the user unable to repair anything.
+- ``uninstall`` still aborts on an unconfirmed restore: removing the plugin while the controller stays managed is not recoverable afterwards. ``--skip-restore`` remains the explicit override.
+- Device validation of the actual rumble pulse is still pending.
+
 ## Alpha.10: recovery can no longer deadlock an install
 
 - `targets()` skips a target object that vanished between listing and reading its type. InputPlumber rebuilds target devices during a restore, so one missing object used to abort the whole restore with a `CalledProcessError` traceback.
@@ -44,7 +51,7 @@ Editor entry explicitly focuses the copy-source control; returning restores the 
 
 The UI has two management choices: enabled and disabled. Fresh installs default to enabled; the backend reconciles without requiring an open panel. Boot and recognized original-state resets reapply Elite and selected mappings. Explicit disable persists before restoration, so failed recovery never re-enables on reboot; recovery errors remain visible with retry. Re-enabling preserves the first snapshot. Updates/repair preserve the choice; clean reinstall resets settings. Legacy active/paused snapshots migrate to enabled; legacy restored snapshots migrate to disabled. Unrelated live changes still stop writes and offer retry rather than requiring restore then enable. Device identity and capability gates remain enforced. Hardware validation is still required.
 
-2026-11-08, preview version 0.1.0-alpha.10. An installer is available for A8 testing; this is not a stable or device-validated release.
+2026-11-08, preview version 0.1.0-alpha.11. An installer is available for A8 testing; this is not a stable or device-validated release.
 
 Implemented: independent versioned default/game/template storage; strict embedded A8 discovery; serialized sysfs writes; finite 500 ms physical-device rumble test; capability-gated InputPlumber discovery, fixed Elite activation, durable recovery snapshot and terminal restore; English/Chinese quick panel and settings pages; independent copying and per-game selection; explicit save-versus-apply error handling.
 
