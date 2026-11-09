@@ -11,22 +11,59 @@ import stat
 import subprocess
 import tempfile
 import urllib.request
+import urllib.error
+import time
 import zipfile
 
-VERSION = "0.1.0-alpha.4"
+VERSION = "0.1.0-alpha.5"
 REPO = "https://github.com/sekirofly/msi-claw-a8-controller-suite"
 NAME = "MSI Claw A8 Controller Suite"
 FOLDER = "msi-claw-a8-controller-suite"
 SERVICE = "plugin_loader.service"
 
 
+def read_url(url, limit, accept=None):
+    headers = {"User-Agent": "msi-claw-a8-controller-suite/" + VERSION}
+    if accept:
+        headers['Accept'] = accept
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=45) as response:
+                data = response.read(limit + 1)
+            if len(data) > limit:
+                raise ValueError("Download exceeds size limit")
+            return data
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if isinstance(exc, urllib.error.HTTPError) and exc.code not in (408, 429, 500, 502, 503, 504):
+                raise
+            if attempt == 2:
+                raise
+            time.sleep(attempt + 1)
+
+
 def fetch(url, limit=16 * 1024 * 1024):
-    request = urllib.request.Request(url, headers={"User-Agent": "msi-claw-a8-controller-suite/" + VERSION})
-    with urllib.request.urlopen(request, timeout=45) as response:
-        data = response.read(limit + 1)
-    if len(data) > limit:
-        raise ValueError("Download exceeds size limit")
-    return data
+    try:
+        return read_url(url, limit)
+    except (urllib.error.URLError, TimeoutError):
+        prefix = REPO + '/releases/download/v' + VERSION + '/'
+        name = url.removeprefix(prefix)
+        if not url.startswith(prefix) or name not in (FOLDER + '.zip', FOLDER + '.zip.sha256'):
+            raise
+        # Public GitHub API route; no token, third-party mirror or verification bypass.
+        print('Release download unavailable; trying GitHub asset API...')
+        api = 'https://api.github.com/repos/sekirofly/msi-claw-a8-controller-suite'
+        release = json.loads(read_url(api + '/releases/tags/v' + VERSION, 1024 * 1024))
+        if release.get('tag_name') != 'v' + VERSION or release.get('draft'):
+            raise ValueError('Unexpected release metadata')
+        assets = [asset for asset in release.get('assets', []) if asset.get('name') == name]
+        if len(assets) != 1:
+            raise ValueError('Release asset missing or ambiguous')
+        asset = assets[0]
+        if (type(asset.get('id')) is not int or asset['id'] <= 0
+                or type(asset.get('size')) is not int or not 0 < asset['size'] <= limit
+                or asset.get('state') != 'uploaded'):
+            raise ValueError('Invalid release asset')
+        return read_url(api + '/releases/assets/' + str(asset['id']), limit, 'application/octet-stream')
 
 
 def unpack(data, destination):
