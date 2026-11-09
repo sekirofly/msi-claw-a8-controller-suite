@@ -1,5 +1,12 @@
 # Initial implementation status
 
+## Alpha.7: callable failures are surfaced
+
+- The serialized guard is a `threading.Lock` held inside the worker thread instead of an `asyncio.Lock` around the await, so a callable cannot fail because of event-loop binding or a cancelled coroutine.
+- An exception raised outside the worker is converted into `internal <Type>: <message>` and recorded, instead of reaching Decky as a bare "Python Exception".
+- `get_state` returns `last_error` and Maintenance → Diagnostics shows it, so a failure names its cause without reading the journal.
+- Rumble test behaviour is unchanged; whether the physical pulse fires is still unverified on the device.
+
 ## Alpha.6: navigation simplified
 
 - The template library page and its storage are removed. Copy sources are the default buttons or another game's saved configuration. Loading an older file drops the legacy `templates` key, and the next save writes the file without it; clean installs never create it.
@@ -15,7 +22,7 @@ Editor entry explicitly focuses the copy-source control; returning restores the 
 
 The UI has two management choices: enabled and disabled. Fresh installs default to enabled; the backend reconciles without requiring an open panel. Boot and recognized original-state resets reapply Elite and selected mappings. Explicit disable persists before restoration, so failed recovery never re-enables on reboot; recovery errors remain visible with retry. Re-enabling preserves the first snapshot. Updates/repair preserve the choice; clean reinstall resets settings. Legacy active/paused snapshots migrate to enabled; legacy restored snapshots migrate to disabled. Unrelated live changes still stop writes and offer retry rather than requiring restore then enable. Device identity and capability gates remain enforced. Hardware validation is still required.
 
-2026-11-08, preview version 0.1.0-alpha.6. An installer is available for A8 testing; this is not a stable or device-validated release.
+2026-11-08, preview version 0.1.0-alpha.7. An installer is available for A8 testing; this is not a stable or device-validated release.
 
 Implemented: independent versioned default/game/template storage; strict embedded A8 discovery; serialized sysfs writes; finite 500 ms physical-device rumble test; capability-gated InputPlumber discovery, fixed Elite activation, durable recovery snapshot and terminal restore; English/Chinese quick panel and settings pages; independent copying and per-game selection; explicit save-versus-apply error handling.
 

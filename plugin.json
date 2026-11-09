@@ -5,7 +5,7 @@
     "root"
   ],
   "api_version": 1,
-  "version": "0.1.0-alpha.6",
+  "version": "0.1.0-alpha.7",
   "publish": {
     "tags": [
       "system",
