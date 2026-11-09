@@ -4,7 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from backend.inputplumber import InputPlumber, IFACE, Bus
+from backend.inputplumber import InputPlumber, IFACE
+from backend.inputplumber import Bus as PlumberBus
 from backend.config import SuiteError, BUTTONS
 
 
@@ -218,4 +219,4 @@ class InputTests(unittest.TestCase):
         for error in (subprocess.CalledProcessError(1, ['busctl']), subprocess.TimeoutExpired('busctl', 5)):
             with patch('backend.inputplumber.subprocess.run', side_effect=error):
                 with self.assertRaisesRegex(SuiteError, 'interface_unavailable'):
-                    Bus().run('get-property', 'x')
+                    PlumberBus().run('get-property', 'x')
