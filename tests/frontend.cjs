@@ -54,7 +54,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     assert.equal(typeof summary.props.onGamepadFocus,'function');
     const saved=JSON.parse(JSON.stringify(state));
     for(const scenario of [
-      {game:null,managed:true,applied:'default',expected:language==='zh-CN'?'正在读取游戏状态':'Reading game status'},
+      {game:null,managed:true,applied:'default',expected:language==='zh-CN'?'游戏：正在读取…':'Game: Reading…'},
       {game:'default',managed:true,applied:'default',expected:language==='zh-CN'?'当前按键：默认按键':'Current buttons: Default buttons'},
       {game:'1',managed:true,applied:'1',expected:language==='zh-CN'?'当前按键：Custom':'Current buttons: Custom'},
       {game:'default',managed:false,applied:null,expected:language==='zh-CN'?'管理已停用':'Management disabled'},
@@ -69,7 +69,8 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
         const text=node=>typeof node==='string'?node:node.children.map(text).join('');
         const content=text(card);
         assert.ok(content.includes(scenario.expected));
-        if(scenario.game==='default')assert.doesNotMatch(content,/游戏：|Game: |正在读取|Reading game/);
+        if(scenario.game==='default')assert.ok(content.includes(language==='zh-CN'?'游戏：未运行':'Game: Not running'));
+        if(scenario.game==='1')assert.ok(content.includes(language==='zh-CN'?'游戏：Game One':'Game: Game One'));
         if(!scenario.applied)assert.doesNotMatch(content,/→/);
         if(scenario.applied==='1')assert.ok(content.includes(language==='zh-CN'?'左 M2 → 右 M1':'Left M2 → Right M1'));
       }finally{await act(async()=>preview?.unmount());}
