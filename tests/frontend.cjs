@@ -9,6 +9,11 @@ const {create,act}=require('react-test-renderer');
 global.IS_REACT_ACT_ENVIRONMENT=true;
 global.requestAnimationFrame=fn=>setTimeout(fn,0);
 global.cancelAnimationFrame=clearTimeout;
+// Focus transfer runs after two animation frames; poll instead of assuming a
+// fixed delay, which made this assertion flaky on loaded machines.
+const waitFor=async(check,timeout=1000)=>{const start=Date.now();
+  while(!check()){if(Date.now()-start>timeout)return;
+    await act(async()=>{await new Promise(r=>setTimeout(r,10))});}};
 
 for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble ordering: ${language}`,async()=>{
   Object.defineProperty(global,'navigator',{value:{language},configurable:true});
@@ -16,7 +21,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
   const hardware={mode:'macro',left:50,right:50};
   const state={config:{revision:0,default:{},games:{},templates:{}},game:'1',game_name:'Game One',
     applied:'default',managed:true,paused:false,hardware,can_test:true,inputplumber:{sources:['M1','M2']}};
-  const ui={Router:{MainRunningApp:{appid:1,display_name:'Game One'}},Navigation:{Navigate(){},CloseSideMenus(){}},showModal(){}};
+  const ui={Router:{MainRunningApp:{appid:1,display_name:'Game One'}},Navigation:{Navigate(){},CloseSideMenus(){}},showModal(el){el?.props?.onOK?.()}};
   for(const n of ['ButtonItem','PanelSection','PanelSectionRow','SliderField','ToggleField','DropdownItem','TextField','ConfirmModal','SidebarNavigation','Focusable'])
     ui[n]=props=>React.createElement(n,props,props.children);
   const api={definePlugin:f=>f,routerHook:{addRoute:(_,f)=>{factory=f},removeRoute(){}},callable:name=>async(...args)=>{
@@ -62,17 +67,27 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       await act(async()=>{await disable.props.onClick();await new Promise(r=>setTimeout(r,10))});
       assert.deepEqual(calls.filter(x=>x[0]==='set_management').at(-1),['set_management',false]);
       assert.match(JSON.stringify(settings.toJSON()),language==='zh-CN'?/启用管理/:/Enable management/);
-      for(const pageIndex of [0,1]) {
+      // Management moved to maintenance; the device page keeps only hardware controls.
+      const pages=navigation.root.findByType('SidebarNavigation').props.pages;
+      assert.equal(pages.length,3);
+      let device;
+      try {
+        await act(async()=>{device=create(pages[1].content)});
+        const deviceText=JSON.stringify(device.toJSON());
+        assert.match(deviceText,language==='zh-CN'?/背键硬件模式/:/Back-button hardware mode/);
+        assert.doesNotMatch(deviceText,language==='zh-CN'?/恢复原配置/:/Restore original/);
+      } finally {await act(async()=>{device?.unmount()});}
+      for(const pageIndex of [0]) {
         let editor;const focused=[];
         try {
           const page=navigation.root.findByType('SidebarNavigation').props.pages[pageIndex].content;
           await act(async()=>{editor=create(page,{createNodeMock:element=>element.type==='Focusable'?{
             querySelector:()=>({focus:()=>focused.push('control')})
           }:null})});
-          const label=pageIndex===0?(language==='zh-CN'?'编辑默认按键':'Edit default buttons'):(language==='zh-CN'?'新建模板':'New template');
+          const label=language==='zh-CN'?'编辑默认按键':'Edit default buttons';
           const open=()=>editor.root.findAllByType('ButtonItem').find(x=>x.props.children===label);
           await act(async()=>{open().props.onClick()});
-          await act(async()=>{await new Promise(r=>setTimeout(r,15))});
+          await waitFor(()=>focused.length===1);
           assert.equal(focused.length,1,'entering editor transfers focus');
           const pairs=editor.root.findAllByType('Focusable').filter(x=>x.props['flow-children']==='row');
           assert.equal(pairs.length,8);
@@ -82,7 +97,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
           assert.deepEqual(labels.slice(0,2),['M1','M2']);
           const back=editor.root.findAllByType('ButtonItem').find(x=>['返回','Back'].includes(x.props.children));
           await act(async()=>{back.props.onClick()});
-          await act(async()=>{await new Promise(r=>setTimeout(r,15))});
+          await waitFor(()=>focused.length===2);
           assert.equal(focused.length,2,'return restores focus to the entry button');
           assert.ok(open());
         } finally {await act(async()=>editor?.unmount());}
