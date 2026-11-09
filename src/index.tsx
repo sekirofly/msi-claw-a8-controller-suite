@@ -9,7 +9,8 @@ type Rules = Record<string, string[]>;
 type Entry = {name: string; rules: Rules; enabled?: boolean};
 type Config = {revision: number; default: Rules; games: Record<string, Entry>};
 type State = {config: Config; game: string | null; game_name: string; applied: string | null; apply_error?: string;
-  managed: boolean; last_error?: string; hardware?: {mode: string; left: number; right: number};
+  managed: boolean; last_error?: string; rumble_test?: {state: string; code?: string; detail?: string};
+  hardware?: {mode: string; left: number; right: number};
   hardware_error?: string; inputplumber_error?: string; inputplumber?: {sources: string[]; profile: string; targets: string[]}; can_test: boolean};
 type Result<T> = {ok: boolean; data: T; error?: string};
 const getState = callable<[], Result<State>>('get_state');
@@ -125,13 +126,30 @@ function RumblePanel({c}: {c: Controller}) {
   useEffect(() => {if(!saving) return; const id=setInterval(() => {
     if(!pending) void chain.then(() => {setSaving(false);setError(writeError);if(writeError) void c.refresh();});
   },250);return () => clearInterval(id);},[saving]);
+  const result = c.state?.rumble_test;
   return <PanelSection title={t('震动 · 所有游戏共用','Rumble · shared by all games')}>
     {[0,1].map(i => <PanelSectionRow key={i}><SliderField label={(i===0?t('左','Left'):t('右','Right'))+` ${values[i]}%`}
       value={values[i]} min={0} max={100} step={5} disabled={!hw || testing || c.busy} onChange={v=>change(i,v)}/></PanelSectionRow>)}
     <PanelSectionRow><ButtonItem disabled={!hw || !c.state?.can_test || testing || c.busy} layout="below" onClick={() => {
-      setTesting(true);setError('');void (async()=>{try {await flushRumble(); if(writeError) throw new Error(writeError);
-        await enqueue(testRumble);}catch(e){setError(String(e));}finally{setTesting(false);}})();
+      setTesting(true);setError('');
+      void (async()=>{
+        try {
+          await flushRumble();
+          // Name the failing step: saving the slider value and sending the test
+          // are different backend calls and used to share one message.
+          if(writeError) throw new Error(t('震动值未保存：','Rumble value not saved: ')+writeError);
+          await enqueue(testRumble);
+        } catch(e) {
+          setError(t('测试调用失败：','Test call failed: ')+String(e));
+        } finally {setTesting(false);}
+        setTimeout(()=>{void c.refresh();},350);
+        setTimeout(()=>{void c.refresh();},1100);
+      })();
     }}>{testing?t('测试中…','Testing…'):t('测试震动 · 0.5 秒','Test rumble · 0.5 seconds')}</ButtonItem></PanelSectionRow>
+    {result?.state==='running'&&row(t('正在发送震动…','Sending the pulse…'))}
+    {result?.state==='ok'&&row(t('上次测试：已向内置手柄发送 0.5 秒效果。','Last test: a 0.5 second effect was sent to the embedded controller.'))}
+    {result?.state==='error'&&row(t('上次测试失败：','Last test failed: ')
+      +(result.code&&result.code!=='operation_failed'?errorText(result.code):(result.detail||result.code||'')))}
     {row(error || (saving?t('正在保存…','Saving…'):t('滑动自动保存；测试只触发内置手柄。','Sliders save automatically; testing targets only the embedded controller.')))}
     {!c.state?.can_test && row(t('此设备的震动测试接口尚不可用','Rumble test interface is unavailable on this device'))}
   </PanelSection>;
@@ -283,7 +301,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复原配置并停用','Restore original configuration and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.7 · GPL-3.0-only')}
+        {row('0.1.0-alpha.8 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {row(t('恢复：先在上方插件管理停用管理。终端恢复和卸载方法见 README。','Recovery: disable management in the section above first. See README for terminal recovery and removal.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
