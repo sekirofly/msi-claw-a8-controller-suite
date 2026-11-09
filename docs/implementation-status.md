@@ -1,5 +1,13 @@
 # Initial implementation status
 
+## Alpha.17: quick-panel clarity and focus scrolling
+
+- Combine applied scope into “Current buttons: Default buttons / game configuration”. Show a game name only when available and distinguish initial game-state loading from no running game.
+- Make the summary a focusable item that scrolls back to the panel top, without moving focus on background refresh. Remove the duplicate quick-panel title.
+- Label and order back buttons Left M2 / Right M1 throughout summary/editor/output choices; preserve stored hardware identifiers. Empty rules display No output.
+- Installation messages distinguish completion from applied controller state and clarify that hardware mode/rumble strengths are preserved.
+- Chinese/English component and Chromium DOM focus/scroll validation; native Steam gamepad navigation requires hardware confirmation.
+
 ## Alpha.16: restore installed system defaults
 
 - No new historical snapshots. Enabled mappings are compiled from installed defaults; disable/uninstall restores the installed default profile and A8 targets.

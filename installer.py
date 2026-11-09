@@ -15,7 +15,7 @@ import urllib.error
 import time
 import zipfile
 
-VERSION = "0.1.0-alpha.16"
+VERSION = "0.1.0-alpha.17"
 REPO = "https://github.com/sekirofly/msi-claw-a8-controller-suite"
 NAME = "MSI Claw A8 Controller Suite"
 FOLDER = "msi-claw-a8-controller-suite"
@@ -255,7 +255,14 @@ def main():
                     raise ValueError('Release checksum mismatch; existing installation unchanged')
                 staged = unpack(data, Path(directory))
             transact(home, args.action, staged, skip_restore=args.skip_restore)
-    print('MSI Claw A8 Controller Suite: ' + args.action + ' complete. Hardware settings unchanged.')
+    label = {'install': '安装完成 / Installation complete.',
+             'reinstall': '重装完成 / Reinstallation complete.',
+             'uninstall': '卸载完成 / Uninstallation complete.'}[args.action]
+    print('MSI Claw A8 Controller Suite: ' + label)
+    print('背键硬件模式和左右震动强度保持不变。 / Back-button hardware mode and left/right rumble strengths were preserved.')
+    if args.action != 'uninstall':
+        print('首次安装默认启用管理；更新/重装保留已保存的启用或停用选择。 / First install enables management by default; updates/reinstalls retain your saved choice.')
+        print('插件启动后按该选择运行。安装完成不代表手柄配置已生效，请在插件中查看状态。 / Management follows that choice at startup. Installation success does not confirm controller configuration was applied; check the plugin status.')
     print('Preview release: disable/remove the original DeckyPlumber and Back Buttons & Rumble plugins before enabling management. Existing suite button configurations are kept on install/update; clean reinstall clears mappings; uninstall restores system defaults.')
     print('IMPORTANT: Save your work and reboot normally before returning to Gaming Mode. Controller detection after a live Decky restart is not reliable on the tested A8.')
     if args.action != 'uninstall':

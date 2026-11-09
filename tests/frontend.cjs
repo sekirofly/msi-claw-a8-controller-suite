@@ -19,7 +19,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
   Object.defineProperty(global,'navigator',{value:{language},configurable:true});
   const calls=[];let factory;let release;let failSave=false;
   const hardware={mode:'macro',left:50,right:50};
-  const state={config:{revision:0,default:{},games:{}},game:'1',game_name:'Game One',
+  const state={config:{revision:0,default:{M2:['B'],M1:[]},games:{}},game:'1',game_name:'Game One',
     applied:'default',managed:true,paused:false,hardware,can_test:true,inputplumber:{sources:['M1','M2']}};
   const ui={Router:{MainRunningApp:{appid:1,display_name:'Game One'}},Navigation:{Navigate(){},CloseSideMenus(){}},showModal(el){el?.props?.onOK?.()}};
   for(const n of ['ButtonItem','PanelSection','PanelSectionRow','SliderField','ToggleField','DropdownItem','TextField','ConfirmModal','SidebarNavigation','Focusable'])
@@ -42,6 +42,37 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     assert.doesNotMatch(json,/Combination|背键硬件模式/);
     if(language==='en-US')assert.doesNotMatch(json,/[\u3400-\u9fff]/);
     assert.deepEqual(calls,[['get_state']]);
+    assert.match(json,language==='zh-CN'?/当前按键：默认按键/:/Current buttons: Default buttons/);
+    assert.match(json,language==='zh-CN'?/左 M2 → B/:/Left M2 → B/);
+    assert.match(json,language==='zh-CN'?/右 M1 → 不输出/:/Right M1 → No output/);
+    assert.doesNotMatch(json,/未运行游戏 \/ 尚未确认|基础映射 \/ 未确认/);
+    const summary=rendered.root.findAllByType('Focusable').find(x=>x.props.tabIndex===0);
+    assert.ok(summary,'summary participates in focus navigation');
+    assert.equal(typeof summary.props.onGamepadFocus,'function');
+    const saved=JSON.parse(JSON.stringify(state));
+    for(const scenario of [
+      {game:null,managed:true,applied:'default',expected:language==='zh-CN'?'正在读取游戏状态':'Reading game status'},
+      {game:'default',managed:true,applied:'default',expected:language==='zh-CN'?'当前按键：默认按键':'Current buttons: Default buttons'},
+      {game:'1',managed:true,applied:'1',expected:language==='zh-CN'?'当前按键：Custom':'Current buttons: Custom'},
+      {game:'default',managed:false,applied:null,expected:language==='zh-CN'?'管理已停用':'Management disabled'},
+      {game:'default',managed:true,applied:null,expected:language==='zh-CN'?'尚未生效':'Not applied'},
+    ]){
+      Object.assign(state,scenario);
+      state.config.games={'1':{name:'Custom',enabled:true,rules:{M2:['M1']}}};
+      let preview;
+      try{
+        await act(async()=>{preview=create(plugin.content)});
+        const card=preview.root.findAllByType('Focusable').find(x=>x.props.tabIndex===0);
+        const text=node=>typeof node==='string'?node:node.children.map(text).join('');
+        const content=text(card);
+        assert.ok(content.includes(scenario.expected));
+        if(scenario.game==='default')assert.doesNotMatch(content,/游戏：|Game: |正在读取|Reading game/);
+        if(!scenario.applied)assert.doesNotMatch(content,/→/);
+        if(scenario.applied==='1')assert.ok(content.includes(language==='zh-CN'?'左 M2 → 右 M1':'Left M2 → Right M1'));
+      }finally{await act(async()=>preview?.unmount());}
+    }
+    Object.assign(state,saved);
+
     await act(async()=>{rendered.root.findAllByType('SliderField')[0].props.onChange(75)});
     const testButton=rendered.root.findAllByType('ButtonItem').find(x=>String(x.props.children).includes('0.5'));
     await act(async()=>{testButton.props.onClick();await Promise.resolve()});
@@ -109,7 +140,13 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
           assert.ok(pairs.every(x=>x.findAllByType('DropdownItem').length===2));
           const labels=pairs.flatMap(x=>x.findAllByType('DropdownItem').map(d=>d.props.label));
           assert.equal(new Set(labels).size,16);
-          assert.deepEqual(labels.slice(0,2),['M1','M2']);
+          assert.deepEqual(labels.slice(0,2),language==='zh-CN'?['左 M2','右 M1']:['Left M2','Right M1']);
+          const backKeys=pairs[0].findAllByType('DropdownItem');
+          assert.equal(backKeys[1].props.selectedOption,'disabled');
+          const target=backKeys[0].props.rgOptions.find(o=>o.data==='M1');
+          assert.equal(target.label,language==='zh-CN'?'右 M1':'Right M1');
+          await act(async()=>{backKeys[0].props.onChange({data:'M1'})});
+          assert.equal(pairs[0].findAllByType('DropdownItem')[0].props.selectedOption,'M1','labels never change stored identifiers');
           const back=editor.root.findAllByType('ButtonItem').find(x=>['返回','Back'].includes(x.props.children));
           await act(async()=>{back.props.onClick()});
           await waitFor(()=>focused.length===2);

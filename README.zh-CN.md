@@ -1,6 +1,6 @@
 # MSI Claw A8 Controller Suite
 
-Alpha.16 简化为“启用管理 / 恢复系统默认并停用”。不再记录接管前配置；从本机 InputPlumber 的系统配置读取默认映射及 A8 默认输出。
+Alpha.17 整理快捷面板：当前按键与配置名合并显示，背键统一标为左 M2 / 右 M1；顶部摘要可获得手柄焦点并滚回顶部。安装提示明确区分文件安装、管理选择与硬件模式/震动强度。
 
 > 首次安装默认启用；主动停用后跨重启保持停用，直到再次启用。恢复目标是系统默认，不是旧插件或用户此前的自定义配置。
 
@@ -8,7 +8,7 @@ Alpha.16 简化为“启用管理 / 恢复系统默认并停用”。不再记�
 
 面向 **MSI Claw A8（AMD Ryzen Z2 Extreme / BZ2EM）** 的综合 Decky 手柄管理插件项目。计划继承现有[背键与震动插件](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble)的硬件控制功能，结合 [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber) 的部分 InputPlumber 管理思路。
 
-**v0.1.0-alpha.16 为可安装预览版，供 A8 实机测试；不是稳定版，新增功能尚未经真机验证。** 现有小插件继续独立维护。第一阶段只针对 A8，不把 Claw 8 AI+ 等其他型号当作已兼容设备。本项目非 MSI 官方产品。
+**v0.1.0-alpha.17 为可安装预览版，供 A8 实机测试；不是稳定版，新增功能尚未经真机验证。** 现有小插件继续独立维护。第一阶段只针对 A8，不把 Claw 8 AI+ 等其他型号当作已兼容设备。本项目非 MSI 官方产品。
 
 ## 安装与更新
 
@@ -16,11 +16,11 @@ Alpha.16 简化为“启用管理 / 恢复系统默认并停用”。不再记�
 2. 在 SteamOS 桌面模式的 Konsole，以普通用户运行：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.16/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.17/install.sh | bash
 ```
 
 3. **安装后保存工作并重启，再回游戏模式。** 若重启后仍有震动消失，可按 [MSI 官方 EC 重置说明](https://www.msi.com/support/technical_details/HH_EC_Reset)恢复；不需要每次都做，插件不会自动重置。
-4. 先检查识别状态，以较低强度点击“测试震动”。按键管理默认启用，确认内置 A8 后自动应用。测试一个简单 M1 映射，再测试“恢复系统默认并停用”；停用选择跨重启保留，点击“启用管理”后重新自动接管。
+4. 先检查识别状态，以较低强度点击“测试震动”。按键管理默认启用，确认内置 A8 后自动应用。测试一个简单的右 M1 映射，再测试“恢复系统默认并停用”；停用选择跨重启保留，点击“启用管理”后重新自动接管。
 
 同一安装命令可覆盖更新，保留按键配置，不会再装一份 Suite。更新不触碰当前接管状态，完成后按已保存的启用/停用选择运行。首次替换原插件是不同项目，不会自动合并原插件文件或配置。
 
@@ -32,9 +32,9 @@ curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-su
 
 ```sh
 # 干净重装，会清除本插件的按键配置
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.16/install.sh | bash -s -- reinstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.17/install.sh | bash -s -- reinstall
 # 干净卸载
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.16/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.17/install.sh | bash -s -- uninstall
 # 离线卸载
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```
@@ -65,10 +65,10 @@ sudo bash ~/homebrew/plugins/msi-claw-a8-controller-suite/diagnostics.sh
 - 保留三个背键硬件模式与左右震动强度独立调节。
 - 唯一识别 A8 内置手柄及 InputPlumber 能力，不管理蓝牙或 USB 外接手柄。
 - 底层固定使用 Xbox Elite，界面按 A8 实体按键显示，不提供虚拟类型选择。
-- 加入 M1/M2 及其他 A8 按键映射，恢复验证通过后加入可选的按游戏映射配置。
+- 加入 左 M2 / 右 M1 及其他 A8 按键映射，恢复验证通过后加入可选的按游戏映射配置。
 - 仅提供简体中文与英文，提供诊断和明确的恢复入口。
 
-界面只呈现 A8 实际按键，包括 M1/M2；Steam 仍可能显示 Xbox Elite 四背键。首次启用管理时保存原配置，仅为已确认的内置手柄设置 Elite 输出；打开插件本身只读。按游戏切换只改变映射。
+界面只呈现 A8 实际按键，包括 左 M2 / 右 M1；Steam 仍可能显示 Xbox Elite 四背键。首次启用管理时保存原配置，仅为已确认的内置手柄设置 Elite 输出；打开插件本身只读。按游戏切换只改变映射。
 
 详见[中文调研与路线](docs/research.zh-CN.md)、[英文源码分析](docs/research.md)及[来源与许可记录](THIRD_PARTY.md)。
 
