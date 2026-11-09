@@ -298,8 +298,8 @@ function QuickPanel() {
         onFocus={revealTop} onGamepadFocus={revealTop}
         style={{padding:'10px 4px',lineHeight:1.5,overflowWrap:'anywhere'}}>
         <div style={{fontSize:16,fontWeight:600}}>{t('当前按键：','Current buttons: ')+current}</div>
-        {game&&<div style={{fontSize:13,marginTop:4}}>{t('游戏：','Game: ')+(s.game_name||game)}</div>}
-        {s.game===null&&<div style={{fontSize:13,marginTop:4}}>{t('正在读取游戏状态，暂不切换配置','Reading game status; keeping the current configuration')}</div>}
+        <div style={{fontSize:13,marginTop:4}}>{t('游戏：','Game: ')+(s.game===null
+          ?t('正在读取…','Reading…'):game?(s.game_name||game):t('未运行','Not running'))}</div>
         {s.managed&&rules&&<div style={{fontSize:14,marginTop:8}}>
           {['M2','M1'].map(key=><div key={key}>{buttonLabel(key)+' → '+outputLabel(key)}</div>)}
         </div>}
@@ -353,7 +353,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.18 · GPL-3.0-only')}
+        {row('0.1.0-alpha.19 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
           action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装当前版本','Repair current version'),

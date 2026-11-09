@@ -1,5 +1,9 @@
 # Initial implementation status
 
+## Alpha.19: consistent game-status row
+
+Always show Game: Not running / game name / Reading… on the second summary line. Configuration selection and the single summary focus stop are unchanged.
+
 ## Alpha.18: remove redundant headings and copy
 
 - The outer navigation alone displays the plugin title. The quick panel starts with its current-button summary, without repeating the normal management state or device scope.
