@@ -162,16 +162,21 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse(json.loads(snapshot.read_text())['active'])
         self.assertTrue(json.loads((snapshot.parent / 'management.json').read_text())['enabled'])
 
-    def test_failed_update_restoration_preserves_disabled_preference(self):
+    def test_failed_update_restoration_warns_and_preserves_disabled_preference(self):
+        # An update warns instead of aborting when the restore cannot be
+        # confirmed, but the explicit disabled choice and the snapshot survive.
         snapshot = self.active_snapshot()
         preference = snapshot.parent / 'management.json'
         preference.write_text('{"enabled":false}')
         def fail(*args, **kwargs):
             preference.write_text('{"enabled":false}')
             raise RuntimeError('device offline')
-        with patch.object(installer, 'service'), patch.object(installer.subprocess, 'run', side_effect=fail):
-            with self.assertRaises(RuntimeError):
-                installer.transact(self.home, 'install')
+        staged = self.home / 'stage'
+        staged.mkdir()
+        (staged / 'plugin.json').write_text(json.dumps({'name': installer.NAME}))
+        with patch.object(installer, 'service'), patch.object(installer.subprocess, 'run', side_effect=fail), \
+             patch.object(installer.os, 'chown', create=True):
+            installer.transact(self.home, 'install', staged)
         self.assertFalse(json.loads(preference.read_text())['enabled'])
         self.assertTrue(json.loads(snapshot.read_text())['active'])
 
