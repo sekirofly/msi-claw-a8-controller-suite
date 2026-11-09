@@ -1,5 +1,12 @@
 # Initial implementation status
 
+## Alpha.9: stale error no longer blocks the rumble test
+
+- `flushRumble()` only reports an error for a save it actually attempted. It used to return the previous chain with a module-level `writeError` that was cleared only when a slider moved, so one failed save made every later test fail with "rumble value not saved".
+- A failed slider save and a failed test call are handled in separate steps; a save failure no longer aborts the test path silently or re-labels the test error.
+- Every callable records `<time> <label> start|ok|error` to `settings/calls.log` (bounded at 64 KB) and the last eight entries are returned in `call_log`, so a failure that happens above the plugin (in Decky's bridge) is distinguishable from one inside it.
+- Device validation of the actual pulse is still pending.
+
 ## Alpha.8: rumble test reports its own outcome
 
 - `test_rumble` now returns immediately and runs `rumble.pulse` on a daemon thread, so the ~0.5 s effect never holds the callable or the device queue. A slow or failing pulse can no longer surface as a failed call.
@@ -29,7 +36,7 @@ Editor entry explicitly focuses the copy-source control; returning restores the 
 
 The UI has two management choices: enabled and disabled. Fresh installs default to enabled; the backend reconciles without requiring an open panel. Boot and recognized original-state resets reapply Elite and selected mappings. Explicit disable persists before restoration, so failed recovery never re-enables on reboot; recovery errors remain visible with retry. Re-enabling preserves the first snapshot. Updates/repair preserve the choice; clean reinstall resets settings. Legacy active/paused snapshots migrate to enabled; legacy restored snapshots migrate to disabled. Unrelated live changes still stop writes and offer retry rather than requiring restore then enable. Device identity and capability gates remain enforced. Hardware validation is still required.
 
-2026-11-08, preview version 0.1.0-alpha.8. An installer is available for A8 testing; this is not a stable or device-validated release.
+2026-11-08, preview version 0.1.0-alpha.9. An installer is available for A8 testing; this is not a stable or device-validated release.
 
 Implemented: independent versioned default/game/template storage; strict embedded A8 discovery; serialized sysfs writes; finite 500 ms physical-device rumble test; capability-gated InputPlumber discovery, fixed Elite activation, durable recovery snapshot and terminal restore; English/Chinese quick panel and settings pages; independent copying and per-game selection; explicit save-versus-apply error handling.
 

@@ -1,5 +1,6 @@
 """Decky entry point. One serialized backend owns all mutations."""
 import asyncio
+import collections
 import logging
 import os
 from pathlib import Path
@@ -40,6 +41,7 @@ class Plugin:
         self.last_test = 0.0
         self.last_error = ''
         self.rumble_test = {'state': 'idle', 'code': '', 'detail': ''}
+        self.call_log = collections.deque(maxlen=40)
         self.maintaining = False
         self.stopping = asyncio.Event()
 
@@ -50,20 +52,38 @@ class Plugin:
             ip = InputPlumber(self.hardware, directory / 'recovery.json')
             self.store, self.ip = store, ip
 
-    async def operation(self, fn):
+    def trace(self, label, detail):
+        """Record every callable entry so a bridge-level failure leaves evidence."""
+        line = '%s %s %s' % (time.strftime('%H:%M:%S'), label, detail[:200])
+        self.call_log.append(line)
+        try:
+            path = Path(os.environ['DECKY_PLUGIN_SETTINGS_DIR']) / 'calls.log'
+            if path.exists() and path.stat().st_size > 64 * 1024:
+                path.unlink()
+            with path.open('a', encoding='utf-8') as stream:
+                stream.write(line + '\n')
+        except Exception:
+            pass
+
+    async def operation(self, fn, label='op'):
         def run():
             with self.lock:
                 return self.work(fn)
+        self.trace(label, 'start')
         try:
-            return await asyncio.to_thread(run)
+            result = await asyncio.to_thread(run)
         except asyncio.CancelledError:
+            self.trace(label, 'cancelled')
             raise
         except BaseException as exc:
             # An exception here would reach Decky, which reports only a bare
             # "Python Exception" and hides the cause from the panel.
             self.last_error = describe(exc)
+            self.trace(label, 'raised ' + describe(exc))
             log.exception('Controller callable failed outside the worker')
             return {'ok': False, 'error': 'internal ' + describe(exc)}
+        self.trace(label, 'ok' if result.get('ok') else 'error ' + str(result.get('error')))
+        return result
 
     def work(self, fn):
         try:
@@ -81,7 +101,7 @@ class Plugin:
         state = {'config': self.store.snapshot(), 'game': self.game, 'game_name': self.game_name,
                  'applied': self.applied, 'apply_error': self.apply_error,
                  'managed': self.ip.enabled, 'last_error': self.last_error,
-                 'rumble_test': dict(self.rumble_test)}
+                 'rumble_test': dict(self.rumble_test), 'call_log': list(self.call_log)[-8:]}
         for key, call in [('hardware', self.hardware.state), ('inputplumber', self.ip.status)]:
             try:
                 state[key] = call()
@@ -94,7 +114,7 @@ class Plugin:
         return state
 
     async def get_state(self):
-        return await self.operation(self.status)
+        return await self.operation(self.status, 'get_state')
 
     def apply_selected(self):
         # Before Steam reports a game, establish the default configuration. Later
@@ -123,24 +143,24 @@ class Plugin:
             self.game, self.game_name = game_id, name
             self.apply_selected()
             return {'applied': self.applied, 'apply_error': self.apply_error}
-        return await self.operation(update)
+        return await self.operation(update, 'report_game')
 
     async def save_config(self, scope, name, rules, enabled, revision):
         def save():
             self.store.save(scope, name, rules, enabled, revision)
             self.apply_selected()
             return self.status()
-        return await self.operation(save)
+        return await self.operation(save, 'save_config')
 
     async def delete_config(self, scope, revision):
         def delete():
             self.store.delete(scope, revision)
             self.apply_selected()
             return self.status()
-        return await self.operation(delete)
+        return await self.operation(delete, 'delete_config')
 
     async def set_hardware(self, mode, left, right):
-        return await self.operation(lambda: self.hardware.set(mode, left, right))
+        return await self.operation(lambda: self.hardware.set(mode, left, right), 'set_hardware')
 
     async def test_rumble(self):
         # The pulse lasts ~0.5 s and must not hold the callable or the device
@@ -164,7 +184,7 @@ class Plugin:
         def start():
             threading.Thread(target=pulse, name='a8-rumble-test', daemon=True).start()
             return True
-        return await self.operation(start)
+        return await self.operation(start, 'test_rumble')
 
     async def set_management(self, enabled):
         def change():
@@ -176,7 +196,7 @@ class Plugin:
             self.ip.ready = False
             self.apply_selected()
             return self.status()
-        return await self.operation(change)
+        return await self.operation(change, 'set_management')
 
     async def _main(self):
         # Independent of the panel/frontend: late devices, reboot and wake recover.
@@ -216,7 +236,7 @@ class Plugin:
                 raise
             self.maintaining = True
             return True
-        return await self.operation(schedule)
+        return await self.operation(schedule, 'maintenance')
 
     async def _unload(self):
         # Updates/reloads must not reset hardware or destroy the recovery snapshot.
