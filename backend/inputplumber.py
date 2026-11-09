@@ -43,6 +43,21 @@ class InputPlumber:
     def __init__(self, hardware, snapshot_path, bus=None):
         self.hardware, self.path, self.bus = hardware, snapshot_path, bus or Bus()
         self.snapshot = json.loads(self.path.read_text(encoding='utf-8')) if self.path.exists() else None
+        self.preference_path = self.path.with_name('management.json')
+        if self.preference_path.exists():
+            preference = json.loads(self.preference_path.read_text(encoding='utf-8'))
+            if type(preference.get('enabled')) is not bool:
+                raise SuiteError('config_corrupt')
+            self.enabled = preference['enabled']
+        else:
+            # Migrate an explicit legacy stop; an active/paused snapshot stays enabled.
+            self.enabled = bool(self.snapshot.get('active')) if self.snapshot else True
+            self.set_enabled(self.enabled)
+        self.ready = False
+
+    def set_enabled(self, enabled):
+        atomic_json(self.preference_path, {'enabled': enabled})
+        self.enabled = enabled
 
     def discover(self):
         identity = self.hardware.discover()
@@ -116,8 +131,6 @@ class InputPlumber:
         atomic_json(self.path, self.snapshot)
 
     def enable(self):
-        if self.snapshot and self.snapshot.get('active'):
-            raise SuiteError('already_managed')
         path, identity = self.discover()
         base = self.profile(path)
         original = self.targets(path)
@@ -129,30 +142,67 @@ class InputPlumber:
         if len(games) != 1 or any(x not in allowed | {'keyboard', 'mouse', 'dbus', 'touchscreen', 'touchpad'} for x in original):
             raise SuiteError('unknown_targets')
         expected = sorted([x for x in original if x not in allowed] + ['xbox-elite'])
-        self.snapshot = {'active': True, 'identity': identity, 'original_profile': base,
-                         'original_targets': original, 'targets': expected, 'expected_profile': base,
-                         'paused': False, 'pending': True}
+        if self.snapshot:
+            if identity != self.snapshot['identity']:
+                raise SuiteError('device_changed')
+            # Never replace the first pre-management profile, even after a stop/reboot.
+            expected = self.snapshot['targets']
+            self.snapshot.update(active=True, paused=False, pending=True, expected_profile=base, error=None)
+        else:
+            self.snapshot = {'active': True, 'identity': identity, 'original_profile': base,
+                             'original_targets': original, 'targets': expected, 'expected_profile': base,
+                             'paused': False, 'pending': True}
         self.persist()  # Durable recovery before first mutation.
         try:
             if expected != original:
                 self.set_targets(path, expected)
             self.snapshot['pending'] = False
             self.persist()
-        except Exception:
+            self.ready = True
+        except Exception as exc:
             self.snapshot['paused'] = True
+            self.snapshot['error'] = str(exc) if isinstance(exc, SuiteError) else 'operation_failed'
             self.persist()
             raise
 
+    def reconcile(self, rules):
+        if not self.enabled:
+            self.restore()
+            return
+        if not self.ready:
+            self.enable()
+        else:
+            try:
+                path, identity = self.discover()
+            except Exception:
+                self.ready = False  # A re-enumerated device needs a fresh activation.
+                raise
+            if identity != self.snapshot['identity']:
+                raise SuiteError('device_changed')
+            # InputPlumber recreates the original output after boot/session changes.
+            # Recognize that reset; unrelated live changes still fail closed in apply().
+            original = copy.deepcopy(self.snapshot['original_profile'])
+            original.pop('target_devices', None)
+            actual = self.profile(path)
+            actual.pop('target_devices', None)
+            if (self.targets(path) == self.snapshot['original_targets']
+                    and canonical(actual) == canonical(original)):
+                self.enable()
+        self.apply(rules)
+
     def apply(self, rules):
         snap = self.snapshot
-        if not snap or not snap.get('active') or snap.get('paused'):
+        if not snap or not snap.get('active'):
             raise SuiteError('management_disabled')
+        if snap.get('paused'):
+            raise SuiteError(snap.get('error') or 'management_disabled')
         path, identity = self.discover()
         if identity != snap['identity']:
             raise SuiteError('device_changed')
         actual = self.profile(path)
         if self.targets(path) != snap['targets'] or canonical(actual) != canonical(snap['expected_profile']):
             snap['paused'] = True
+            snap['error'] = 'external_change'
             self.persist()
             raise SuiteError('external_change')
         desired = compile_profile(snap['original_profile'], rules)
@@ -168,8 +218,9 @@ class InputPlumber:
                 raise SuiteError('external_change')
             snap['expected_profile'] = actual
             self.persist()
-        except Exception:
+        except Exception as exc:
             snap['paused'] = True
+            snap['error'] = str(exc) if isinstance(exc, SuiteError) else 'operation_failed'
             self.persist()
             raise
 
@@ -190,6 +241,7 @@ class InputPlumber:
         snap['active'] = False
         snap['paused'] = False
         self.persist()
+        self.ready = False
 
 
 def canonical(value):

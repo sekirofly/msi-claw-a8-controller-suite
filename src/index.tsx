@@ -9,7 +9,7 @@ type Rules = Record<string, string[]>;
 type Entry = {name: string; rules: Rules; enabled?: boolean};
 type Config = {revision: number; default: Rules; games: Record<string, Entry>; templates: Record<string, Entry>};
 type State = {config: Config; game: string | null; game_name: string; applied: string | null; apply_error?: string;
-  managed: boolean; paused: boolean; hardware?: {mode: string; left: number; right: number};
+  managed: boolean; hardware?: {mode: string; left: number; right: number};
   hardware_error?: string; inputplumber_error?: string; inputplumber?: {sources: string[]; profile: string; targets: string[]}; can_test: boolean};
 type Result<T> = {ok: boolean; data: T; error?: string};
 const getState = callable<[], Result<State>>('get_state');
@@ -33,8 +33,8 @@ function errorText(code?: string): string {
     composite_ambiguous:['无法唯一确认内置 InputPlumber 设备','Cannot uniquely identify the embedded InputPlumber device'],
     interface_unavailable:['接口不可用，请查看诊断','Interface unavailable; check diagnostics'],
     yaml_missing:['需要系统 Python PyYAML','System Python PyYAML is required'],
-    external_change:['设备配置已变化，管理已暂停；请先恢复再启用','Device state changed; management paused. Restore before enabling again'],
-    management_disabled:['按键管理尚未启用或已暂停','Mapping management is disabled or paused'],
+    external_change:['手柄配置发生变化，请检查冲突后重试','Controller configuration changed. Check for conflicts and retry'],
+    management_disabled:['配置尚未应用，请重试','Configuration has not been applied. Retry'],
     stale_edit:['配置已被修改，请重新打开编辑页','Configuration changed; reopen the editor'],
     source_unavailable:['设备未报告该输入，未应用配置','Device does not report this input; configuration not applied'],
     game_unknown:['当前游戏未确认，未切换配置','Current game is unknown; configuration was not switched'],
@@ -101,7 +101,11 @@ function confirm(title: string, description: string, action: () => void) {
 function Header({c}: {c: Controller}) {
   return <PanelSection title="MSI Claw A8 Controller Suite">
     {row(c.error || (c.state ? t('仅管理 A8 内置手柄','Embedded A8 controller only') : t('正在读取…','Reading…')))}
-    {c.state?.apply_error && row(t('未确认生效：','Not confirmed applied: ')+errorText(c.state.apply_error))}
+    {c.state && row(c.state.managed?t('管理已启用','Management enabled'):t('管理已停用','Management disabled'))}
+    {c.state?.apply_error && <>
+      {row((c.state.managed?t('尚未生效：','Not applied: '):t('原配置尚未恢复：','Original configuration not yet restored: '))+errorText(c.state.apply_error))}
+      <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>void c.run(()=>enqueue(()=>manage(c.state!.managed)))}>{t('重试','Retry')}</ButtonItem></PanelSectionRow>
+    </>}
     {c.state?.hardware_error && row(errorText(c.state.hardware_error))}
   </PanelSection>;
 }
@@ -221,10 +225,9 @@ function Settings({page}:{page:'configs'|'templates'|'hardware'|'about'}) {
     </PanelSection>}
     {page==='hardware'&&<><PanelSection title={t('手柄设置 · 所有游戏共用','Device settings · shared by all games')}>
       {s.inputplumber_error&&row(errorText(s.inputplumber_error))}
-      <PanelSectionRow><ButtonItem disabled={c.busy||(!s.managed&&!s.inputplumber)} onClick={()=>confirm(s.managed?t('恢复并停用管理','Restore and disable management'):t('启用内置手柄管理','Enable embedded controller management'),
-        t('仅更改已确认的内置手柄。手柄可能短暂断开；启用前请停用原两个插件。','Only the verified embedded controller is changed. It may disconnect briefly. Disable both original plugins before enabling.'),
-        ()=>void c.run(()=>enqueue(()=>manage(!s.managed))))}>{s.managed?t('恢复接管前配置并停用','Restore original configuration and disable'):t('启用内置手柄管理','Enable embedded controller management')}</ButtonItem></PanelSectionRow>
-      {s.paused&&row(t('管理已暂停，请恢复后重新启用。','Management is paused. Restore before enabling again.'))}
+      <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>void c.run(()=>enqueue(()=>manage(!s.managed)))}>
+        {s.managed?t('恢复原配置并停用','Restore original configuration and disable'):t('启用管理','Enable management')}
+      </ButtonItem></PanelSectionRow>
       {['macro','combination','disabled'].map(mode=><PanelSectionRow key={mode}><ButtonItem disabled={c.busy||!s.hardware}
         onClick={()=>void c.run(()=>enqueue(()=>setHardware(mode,null,null)))}>{s.hardware?.mode===mode?'● ':'○ '}{mode}</ButtonItem></PanelSectionRow>)}
       {row(t('背键硬件模式可能影响独立 M1/M2 事件；不会自动更改。','Hardware back-button mode can affect independent M1/M2 events; it is never changed automatically.'))}

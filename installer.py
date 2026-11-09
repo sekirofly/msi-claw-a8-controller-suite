@@ -108,14 +108,25 @@ def restore_before_removal(home, staged=None):
     backup = recovery_dir / ('snapshot-' + str(time.time_ns()) + '.json')
     shutil.copyfile(snapshot, backup)
     backup.chmod(0o600)
+    preference = settings / 'management.json'
+    enabled = json.loads(preference.read_text())['enabled'] if preference.exists() else True
     target = home / 'plugins' / FOLDER
     helper_root = target if (target / 'recover.py').is_file() else staged
     if helper_root is None:
         raise ValueError('Active recovery snapshot exists but recovery code is missing; files preserved')
-    subprocess.run(['python3', str(helper_root / 'recover.py'), '--settings-dir', str(settings)],
-                   check=True, timeout=90)
-    if json.loads(snapshot.read_text(encoding='utf-8')).get('active'):
-        raise ValueError('Recovery did not complete; files preserved')
+    try:
+        subprocess.run(['python3', str(helper_root / 'recover.py'), '--settings-dir', str(settings)],
+                       check=True, timeout=90)
+        if json.loads(snapshot.read_text(encoding='utf-8')).get('active'):
+            raise ValueError('Recovery did not complete; files preserved')
+    finally:
+        # Maintenance restoration is temporary, including a failed update rollback.
+        temporary = preference.with_suffix('.tmp')
+        with temporary.open('w', encoding='utf-8') as stream:
+            json.dump({'enabled': enabled}, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, preference)
 
 
 def transact(home, action, staged=None):

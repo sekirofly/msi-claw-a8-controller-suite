@@ -43,6 +43,122 @@ class InputTests(unittest.TestCase):
         self.path=Path(self.tmp.name)/'recovery.json'
         self.bus=Bus();self.ip=InputPlumber(Hardware(),self.path,self.bus)
 
+    def reboot(self):
+        self.ip = InputPlumber(Hardware(), self.path, self.bus)
+
+    def test_first_install_and_reboot_auto_enable(self):
+        original = copy.deepcopy(self.bus.profile)
+        targets = list(self.bus.target)
+        self.assertTrue(self.ip.enabled)
+        self.ip.reconcile({'M1': ['A']})
+        self.assertIn('xbox-elite', self.bus.target)
+        self.bus.profile, self.bus.target = original, targets
+        self.reboot()
+        self.ip.reconcile({'M1': ['A']})
+        self.assertIn('xbox-elite', self.bus.target)
+        self.assertEqual(self.bus.profile['mapping'][0]['name'], 'M1')
+        self.assertEqual(self.ip.snapshot['original_profile'], original)
+
+    def test_session_reset_without_backend_restart(self):
+        original, targets = copy.deepcopy(self.bus.profile), list(self.bus.target)
+        self.ip.reconcile({'M2': ['B']})
+        self.bus.profile, self.bus.target = original, sorted(targets)
+        self.ip.reconcile({'M2': ['B']})
+        self.assertIn('xbox-elite', self.bus.target)
+        self.assertEqual(self.bus.profile['mapping'][0]['name'], 'M2')
+
+    def test_disabled_survives_reboot_and_reenable_preserves_first_snapshot(self):
+        original = copy.deepcopy(self.bus.profile)
+        self.ip.reconcile({'M1': ['A']})
+        self.ip.set_enabled(False)
+        self.ip.reconcile({})
+        self.reboot()
+        self.bus.calls.clear()
+        self.ip.reconcile({})
+        self.assertFalse(self.ip.enabled)
+        self.assertEqual(self.bus.calls, [])
+        self.bus.profile['name'] = 'Changed while disabled'
+        self.ip.set_enabled(True)
+        self.ip.reconcile({})
+        self.assertEqual(self.ip.snapshot['original_profile'], original)
+        self.ip.set_enabled(False)
+        self.ip.reconcile({})
+        self.assertEqual(self.bus.profile, original)
+
+    def test_disable_before_first_device_is_available(self):
+        self.ip.set_enabled(False)
+        self.reboot()
+        self.ip.reconcile({})
+        self.assertEqual(self.bus.calls, [])
+        self.assertIsNone(self.ip.snapshot)
+
+    def test_failed_restore_never_reenables_after_reboot(self):
+        self.ip.reconcile({})
+        self.ip.set_enabled(False)
+        self.bus.fail = True
+        with self.assertRaises(RuntimeError):
+            self.ip.reconcile({})
+        self.reboot()
+        self.assertFalse(self.ip.enabled)
+        self.assertTrue(self.ip.snapshot['active'])
+        self.bus.fail = False
+        self.ip.reconcile({})
+        self.assertNotIn('xbox-elite', self.bus.target)
+        self.assertFalse(self.ip.snapshot['active'])
+
+    def test_legacy_paused_snapshot_recovers_without_restore_button(self):
+        self.ip.enable()
+        self.ip.snapshot['paused'] = True
+        self.ip.persist()
+        self.ip.preference_path.unlink()
+        self.reboot()
+        self.ip.reconcile({})
+        self.assertTrue(self.ip.enabled)
+        self.assertFalse(self.ip.snapshot['paused'])
+
+    def test_legacy_explicit_stop_stays_disabled(self):
+        self.ip.enable()
+        self.ip.restore()
+        self.ip.preference_path.unlink()
+        self.reboot()
+        self.assertFalse(self.ip.enabled)
+
+    def test_repeated_reconcile_does_not_recreate_output(self):
+        self.ip.reconcile({'M1': ['A']})
+        self.bus.calls.clear()
+        self.ip.reconcile({'M1': ['A']})
+        self.assertTrue(all(name == 'GetProfileYaml' for _, name in self.bus.calls))
+
+    def test_late_device_recovers_automatically(self):
+        paths = self.bus.paths
+        self.bus.paths = lambda: []
+        with self.assertRaisesRegex(SuiteError, 'composite_ambiguous'):
+            self.ip.reconcile({})
+        self.assertFalse(self.path.exists())
+        self.bus.paths = paths
+        self.ip.reconcile({})
+        self.assertIn('xbox-elite', self.bus.target)
+
+    def test_different_identity_never_replaces_original_snapshot(self):
+        self.ip.reconcile({})
+        original = self.path.read_bytes()
+        self.reboot()
+        self.ip.hardware.discover = lambda: {'usb': 'different'}
+        self.bus.calls.clear()
+        with self.assertRaisesRegex(SuiteError, 'device_changed'):
+            self.ip.reconcile({})
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertTrue(all(name == 'GetProfileYaml' for _, name in self.bus.calls))
+
+    def test_external_change_requires_retry_not_restore(self):
+        self.ip.reconcile({})
+        self.bus.profile['name'] = 'External'
+        with self.assertRaisesRegex(SuiteError, 'external_change'):
+            self.ip.reconcile({})
+        self.ip.ready = False  # Explicit retry of the existing enabled choice.
+        self.ip.reconcile({})
+        self.assertEqual(self.bus.profile['name'], 'MSI Claw A8 Controller Suite')
+
     def test_targets_only_selected_embedded(self):
         self.ip.enable();self.ip.apply({'M1':['A']})
         self.assertTrue(all(p=='/compositeA8' for p,name in self.bus.calls))

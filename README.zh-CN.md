@@ -1,5 +1,7 @@
 # MSI Claw A8 Controller Suite
 
+> 开发分支变更（尚未发布）：首次安装默认启用管理，重启及会话恢复后自动重新应用；主动停用后一直停用，直到再次启用。首次接管前快照不覆盖。下面固定的 alpha.2 安装命令仍安装旧版行为。
+
 [English](README.md) | 简体中文
 
 面向 **MSI Claw A8（AMD Ryzen Z2 Extreme / BZ2EM）** 的综合 Decky 手柄管理插件项目。计划继承现有[背键与震动插件](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble)的硬件控制功能，结合 [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber) 的部分 InputPlumber 管理思路。

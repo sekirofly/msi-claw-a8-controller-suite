@@ -1,5 +1,9 @@
 # 合并前审查：设计与父项目的差异
 
+## 后续决策
+
+用户已确认采用默认启用、持久停用的两状态管理，取代本文首次手动接管及恢复后重新启用的旧流程。首次原配置只保存一次，启动由后台自动应用；恢复或应用失败显示错误并提供重试。具体规则见设计文档“最新确认”。以下为原始整合评审记录。
+
 2026-11-07；仅源码审查，未在 A8 做新增功能测试。当前需求以[设计文档](design.zh-CN.md)为准。结论：可以进入分阶段实现，但不是直接拼接两个插件；以下项目必须改写或验证。
 
 审查基线：[小插件 v1.0.1](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble/tree/v1.0.1)、[DeckyPlumber cebd2fc](https://github.com/aarron-lee/DeckyPlumber/tree/cebd2fcab2f6bc17968d1d4c4bf8cb9fa992b3a5)、[InputPlumber 6aca920](https://github.com/ShadowBlip/InputPlumber/tree/6aca9202fb8dfd6f31241c3f98b72df4a775c1a1)。上游当前能力不代表掌机已安装版本具备相同接口。

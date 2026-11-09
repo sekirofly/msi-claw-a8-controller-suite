@@ -1,5 +1,7 @@
 # MSI Claw A8 Controller Suite
 
+> Development branch update (not yet released): first installation now enables management automatically. Reboot/session recovery reapplies the suite state; an explicit disable persists across restarts. The first original snapshot is retained. The pinned alpha.2 installer below still installs the previous behavior.
+
 English | [简体中文](README.zh-CN.md)
 
 A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / BZ2EM)**, combining the hardware controls from [MSI Claw A8 Back Buttons & Rumble](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble) with selected InputPlumber integration inspired by [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber).
