@@ -176,12 +176,6 @@ class Plugin:
     async def test_rumble(self):
         # The pulse lasts ~0.5 s and must not hold the callable or the device
         # queue, so it runs on its own thread and reports through status().
-        requested = time.monotonic()
-        if requested - self.last_test < 1:
-            return {'ok': False, 'error': 'test_busy'}
-        self.last_test = requested
-        self.rumble_test = {'state': 'running', 'code': '', 'detail': ''}
-
         def pulse():
             try:
                 rumble.pulse(self.hardware)
@@ -193,7 +187,16 @@ class Plugin:
                 log.exception('Rumble test failed (%s)', code)
 
         def start():
-            threading.Thread(target=pulse, name='a8-rumble-test', daemon=True).start()
+            requested = time.monotonic()
+            if self.rumble_test['state'] == 'running' or requested - self.last_test < 1:
+                raise SuiteError('test_busy')
+            self.last_test = requested
+            self.rumble_test = {'state': 'running', 'code': '', 'detail': ''}
+            try:
+                threading.Thread(target=pulse, name='a8-rumble-test', daemon=True).start()
+            except Exception:
+                self.rumble_test = {'state': 'idle', 'code': '', 'detail': ''}
+                raise
             return True
         return await self.operation(start, 'test_rumble')
 
@@ -219,8 +222,8 @@ class Plugin:
             if self.stopping.is_set():
                 return
             if not self.maintaining:
-                await self.operation(self.apply_selected, 'startup')
-                if not self.apply_error:
+                result = await self.operation(self.apply_selected, 'startup')
+                if result['ok'] and not self.apply_error:
                     return
             try:
                 await asyncio.wait_for(self.stopping.wait(), timeout=2)
@@ -263,8 +266,12 @@ class Plugin:
         self.stopping.set()
         # Wait briefly for an in-flight device write, but never block shutdown:
         # Decky kills a plugin that is still alive five seconds after the request.
+        def drain():
+            # Cancellation cannot stop a worker thread. Acquire and release in
+            # that same worker so a cancelled await never strands the lock.
+            if self.lock.acquire(timeout=2):
+                self.lock.release()
         try:
-            await asyncio.wait_for(asyncio.to_thread(self.lock.acquire), timeout=2)
-            self.lock.release()
-        except (asyncio.TimeoutError, asyncio.CancelledError):
+            await asyncio.to_thread(drain)
+        except asyncio.CancelledError:
             pass

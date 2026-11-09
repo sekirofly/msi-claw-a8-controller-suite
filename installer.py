@@ -15,7 +15,7 @@ import urllib.error
 import time
 import zipfile
 
-VERSION = "0.1.0-alpha.14"
+VERSION = "0.1.0-alpha.15"
 REPO = "https://github.com/sekirofly/msi-claw-a8-controller-suite"
 NAME = "MSI Claw A8 Controller Suite"
 FOLDER = "msi-claw-a8-controller-suite"
@@ -142,9 +142,6 @@ def restore_before_removal(home, staged=None, skip=False, fatal=True):
     data = json.loads(snapshot.read_text(encoding='utf-8'))
     if not data.get('active'):
         return
-    if skip:
-        print('WARNING: skipping restoration of the original controller state on request (--skip-restore).')
-        return
     recovery_dir = home / ('.' + FOLDER + '-recovery')
     if recovery_dir.is_symlink():
         raise ValueError('Refusing symlink recovery directory')
@@ -153,6 +150,10 @@ def restore_before_removal(home, staged=None, skip=False, fatal=True):
     backup = recovery_dir / ('snapshot-' + str(time.time_ns()) + '.json')
     shutil.copyfile(snapshot, backup)
     backup.chmod(0o600)
+    if skip:
+        print('WARNING: skipping restoration of the original controller state on request (--skip-restore). '
+              'Recovery snapshot retained at ' + str(backup))
+        return
     preference = settings / 'management.json'
     enabled = json.loads(preference.read_text())['enabled'] if preference.exists() else True
     target = home / 'plugins' / FOLDER
@@ -215,6 +216,7 @@ def transact(home, action, staged=None, skip_restore=False):
     install_started = False
     stopped = False
     cleanup = False
+    retained = {}
     try:
         service('stop')
         stopped = True
@@ -225,6 +227,16 @@ def transact(home, action, staged=None, skip_restore=False):
         # and made installs slow and flaky for no benefit.
         if action in ('uninstall', 'reinstall'):
             restore_before_removal(home, staged, skip=skip_restore, fatal=(action == 'uninstall'))
+        if action == 'reinstall':
+            settings = home / 'settings' / FOLDER
+            snapshot = settings / 'recovery.json'
+            if snapshot.exists() and json.loads(snapshot.read_text()).get('active'):
+                # A failed/skipped restore must not make the new plugin record
+                # its own managed profile as the pre-management original.
+                for name in ('recovery.json', 'management.json'):
+                    source = settings / name
+                    if source.exists():
+                        retained[name] = source.read_bytes()
         for index, path in enumerate(paths):
             if path.exists():
                 saved = backup / str(index)
@@ -236,6 +248,13 @@ def transact(home, action, staged=None, skip_restore=False):
             for path in [target, *target.rglob('*')]:
                 os.chown(path, 0, 0)
                 path.chmod(0o755 if path.is_dir() else 0o644)
+        if retained:
+            settings = home / 'settings' / FOLDER
+            settings.mkdir(parents=True, exist_ok=True)
+            for name, content in retained.items():
+                destination = settings / name
+                destination.write_bytes(content)
+                destination.chmod(0o600)
         service('start')
         service('is-active')
         cleanup = True

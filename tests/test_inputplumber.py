@@ -211,9 +211,9 @@ class InputTests(unittest.TestCase):
         self.assertTrue(self.ip.set_targets('/compositeA8', self.bus.target))
         self.assertEqual(self.bus.calls, [])
 
-    def test_disappearing_target_object_is_skipped(self):
+    def test_disappearing_target_object_cannot_be_saved_as_partial_original(self):
         # InputPlumber can drop a target object between listing it and reading
-        # its type; that must not fail targets() and, with it, a restore.
+        # its type; that must not produce an incomplete recovery snapshot.
         original = self.bus.property
         def property_(path, interface, name):
             if name == 'TargetDevices':
@@ -222,7 +222,24 @@ class InputTests(unittest.TestCase):
                 raise SuiteError('interface_unavailable')
             return original(path, interface, name)
         self.bus.property = property_
-        self.assertEqual(self.ip.targets('/compositeA8'), ['/compositeA8/target/a'])
+        with self.assertRaisesRegex(SuiteError, 'interface_unavailable'):
+            self.ip.enable()
+        self.assertIsNone(self.ip.snapshot)
+        self.assertFalse(any(name in ('SetTargetDevices', 'LoadProfileFromYaml') for _, name in self.bus.calls))
+
+    def test_transient_target_read_retries_the_entire_list(self):
+        original = self.bus.property
+        reads = []
+        def property_(path, interface, name):
+            if name == 'TargetDevices':
+                reads.append(True)
+            if name == 'DeviceType' and len(reads) == 1:
+                raise SuiteError('interface_unavailable')
+            return original(path, interface, name)
+        self.bus.property = property_
+        with patch('backend.inputplumber.time.sleep'):
+            self.assertEqual(self.ip.targets('/compositeA8'), sorted(self.bus.target))
+        self.assertEqual(len(reads), 2)
 
     def test_busctl_failure_becomes_suite_error(self):
         for error in (subprocess.CalledProcessError(1, ['busctl']), subprocess.TimeoutExpired('busctl', 5)):

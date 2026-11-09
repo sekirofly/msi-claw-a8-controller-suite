@@ -56,6 +56,7 @@ function errorText(code?: string): string {
 let chain: Promise<unknown> = Promise.resolve();
 let rumbleTimer: ReturnType<typeof setTimeout> | undefined;
 let pending: [number, number] | undefined;
+let rumbleWrite: Promise<void> | undefined;
 let writeError = '';
 let outstanding = 0;
 const stateListeners = new Set<() => void>();
@@ -70,14 +71,18 @@ const enqueue = <T,>(action: () => Promise<Result<T>>): Promise<T> => {
 };
 function flushRumble() {
   clearTimeout(rumbleTimer); rumbleTimer = undefined;
-  // No pending write means there is nothing to report: returning the previous
-  // chain (or a stale writeError) made one failed save block every later test.
-  if (!pending) return Promise.resolve();
+  // Await a save already started by the debounce, but forget settled failures:
+  // a stale chain/error must not block every later test.
+  if (!pending) return rumbleWrite ?? Promise.resolve();
   const [left,right] = pending; pending = undefined;
   writeError = '';
-  return enqueue(() => setHardware(null,left,right)).then(
+  const write = enqueue(() => setHardware(null,left,right)).then(
     () => {writeError = '';},
     e => {writeError = String(e); throw e;});
+  rumbleWrite = write;
+  const settled = () => {if (rumbleWrite === write) rumbleWrite = undefined;};
+  void write.then(settled, settled);
+  return write;
 }
 function scheduleRumble(left: number, right: number) {
   pending = [left,right]; clearTimeout(rumbleTimer);
@@ -317,7 +322,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复原配置并停用','Restore original configuration and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.14 · GPL-3.0-only')}
+        {row('0.1.0-alpha.15 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {row(t('恢复：先在上方插件管理停用管理。终端恢复和卸载方法见 README。','Recovery: disable management in the section above first. See README for terminal recovery and removal.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(

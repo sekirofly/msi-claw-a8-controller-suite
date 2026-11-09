@@ -196,6 +196,36 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(self.target.exists())
         self.assertEqual(snapshot.read_text(), 'corrupt')
 
+    def test_skip_restore_uninstall_keeps_emergency_snapshot(self):
+        snapshot = self.active_snapshot()
+        original = snapshot.read_bytes()
+        with patch.object(installer, 'service'):
+            installer.transact(self.home, 'uninstall', skip_restore=True)
+        copies = list((self.home / ('.' + installer.FOLDER + '-recovery')).glob('*.json'))
+        self.assertEqual(len(copies), 1)
+        self.assertEqual(copies[0].read_bytes(), original)
+
+    def test_reinstall_retains_active_recovery_and_preference(self):
+        for skip in (False, True):
+            with self.subTest(skip=skip):
+                settings = self.home / 'settings' / installer.FOLDER
+                settings.mkdir(parents=True, exist_ok=True)
+                original = {'active': True, 'original_profile': {'name': 'original'}}
+                (settings / 'recovery.json').write_text(json.dumps(original))
+                (settings / 'management.json').write_text('{"enabled":false}')
+                (settings / 'config.json').write_text('{}')
+                (self.target / 'recover.py').write_text('# fixture')
+                staged = self.home / ('stage-' + str(skip))
+                staged.mkdir()
+                (staged / 'plugin.json').write_text(json.dumps({'name': installer.NAME}))
+                with patch.object(installer, 'service'), patch.object(installer.os, 'chown'), \
+                     patch.object(installer.subprocess, 'run', side_effect=RuntimeError('offline')), \
+                     patch('time.sleep'):
+                    installer.transact(self.home, 'reinstall', staged, skip_restore=skip)
+                self.assertEqual(json.loads((settings / 'recovery.json').read_text()), original)
+                self.assertFalse(json.loads((settings / 'management.json').read_text())['enabled'])
+                self.assertFalse((settings / 'config.json').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -106,16 +106,17 @@ class InputPlumber:
         return profile
 
     def targets(self, path):
-        # A target object can vanish between listing and reading its type while
-        # InputPlumber rebuilds devices; skip it and let the caller retry rather
-        # than failing the whole read (and with it a restore or an install).
-        result = []
-        for target in self.bus.property(path, IFACE, 'TargetDevices'):
+        # Retry a complete read when objects vanish during a rebuild. A partial
+        # list must never become the original snapshot or confirm restoration.
+        for attempt in range(3):
             try:
-                result.append(self.bus.property(target, 'org.shadowblip.Input.Target', 'DeviceType'))
+                paths = self.bus.property(path, IFACE, 'TargetDevices')
+                return sorted(self.bus.property(target, 'org.shadowblip.Input.Target', 'DeviceType')
+                              for target in paths)
             except SuiteError:
-                continue
-        return sorted(result)
+                if attempt == 2:
+                    raise
+                time.sleep(.1)
 
     def status(self):
         path, identity = self.discover()
@@ -140,8 +141,11 @@ class InputPlumber:
         self.bus.call(path, IFACE, 'SetTargetDevices', 'as', len(values), *values)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if self.targets(path) == wanted:
-                return True
+            try:
+                if self.targets(path) == wanted:
+                    return True
+            except SuiteError:
+                pass  # Rebuilding objects are not a confirmed target set.
             time.sleep(.1)
         actual = self.targets(path)
         log.warning('SetTargetDevices wanted %s, read back %s', wanted, actual)
