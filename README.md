@@ -1,12 +1,12 @@
 # MSI Claw A8 Controller Suite
 
-> Development branch update (not yet released): first installation now enables management automatically. Reboot/session recovery reapplies the suite state; an explicit disable persists across restarts. The first original snapshot is retained. The pinned alpha.2 installer below still installs the previous behavior.
+> Alpha.3 uses two persistent management choices: enabled by default on first installation, or explicitly disabled until you enable it again. Startup restores the suite state automatically and preserves the first original snapshot.
 
 English | [简体中文](README.zh-CN.md)
 
 A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / BZ2EM)**, combining the hardware controls from [MSI Claw A8 Back Buttons & Rumble](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble) with selected InputPlumber integration inspired by [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber).
 
-**Status: v0.1.0-alpha.2 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
+**Status: v0.1.0-alpha.3 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
 
 ## Install / update the preview
 
@@ -14,13 +14,13 @@ A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / B
 2. In SteamOS Desktop Mode, open Konsole and run as your normal desktop user:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.2/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.3/install.sh | bash
 ```
 
 3. **Save work and reboot before returning to Gaming Mode.** If vibration remains unavailable after reboot, an EC reset may help; follow [MSI's official EC reset guidance](https://www.msi.com/support/technical_details/HH_EC_Reset). EC reset is not required routinely and is never automated.
-4. Open the suite, inspect device status, and first test rumble at a modest strength. Mapping management starts disabled. Enable it under **Device settings** only after the embedded A8 is identified; then test a simple M1 mapping and restore it.
+4. Open the suite, inspect device status, and first test rumble at a modest strength. Management starts enabled and applies automatically once the embedded A8 is identified. Test a simple M1 mapping, then test **Restore original configuration and disable**. This choice persists across reboot; **Enable management** resumes automatic management.
 
-The installer checks the version-pinned ZIP and SHA-256 checksum, then briefly restarts Decky. It never restarts InputPlumber. A checksum detects corruption, not an independently signed release. Normal install/update retains button configurations but restores any active suite-managed InputPlumber state first, so re-enable management afterward. Keyboard and mouse are useful while testing controller configuration.
+The installer checks the version-pinned ZIP and SHA-256 checksum, then briefly restarts Decky. It never restarts InputPlumber. A checksum detects corruption, not an independently signed release. Normal install/update retains button configurations but restores any active suite-managed InputPlumber state first, then resumes the saved enabled/disabled choice. Keyboard and mouse are useful while testing controller configuration.
 
 No system Python changes are needed: pure-Python PyYAML is bundled. Unknown board/USB topology or missing InputPlumber APIs disables the affected operation instead of guessing another controller. Read [preview limitations](docs/implementation-status.md).
 
@@ -30,9 +30,9 @@ The Maintenance page provides repair (same version, keep configurations), clean 
 
 ```sh
 # Clean reinstall: restore input state, clear this suite's configurations, install again
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.2/install.sh | bash -s -- reinstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.3/install.sh | bash -s -- reinstall
 # Clean uninstall
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.2/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.3/install.sh | bash -s -- uninstall
 # Offline clean uninstall using installed code
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```
@@ -56,7 +56,7 @@ sudo bash ~/homebrew/plugins/msi-claw-a8-controller-suite/diagnostics.sh
 - Add M1/M2 and other A8 button mappings, then optional per-game mapping profiles after recovery is validated.
 - Provide Simplified Chinese and English interfaces, diagnostics, and explicit restore controls.
 
-The UI represents the actual A8 buttons, including M1/M2. Steam may still identify an Xbox Elite with four paddles. First activation snapshots the original configuration and establishes Elite output only for the verified embedded controller; simply opening the plugin is read-only. Per-game changes only update mappings.
+The UI represents the actual A8 buttons, including M1/M2. Steam may still identify an Xbox Elite with four paddles. First automatic activation snapshots the original configuration and establishes Elite output only for the verified embedded controller. The backend reconciles independently of the panel; opening the panel adds no writes. Per-game changes only update mappings.
 
 ## Research and implementation plan
 
@@ -66,7 +66,7 @@ Confirmed: each game has at most one independent configuration, copied from defa
 
 See [code research and capability matrix](docs/research.md), [中文调研与路线](docs/research.zh-CN.md), and [source provenance](THIRD_PARTY.md).
 
-First implementation milestone: port the proven hardware controls and add read-only device/capability discovery. No automatic InputPlumber restart or controller replacement on startup. Subsequent milestones require A8 testing of input, rumble, menu buttons and recovery paths.
+First implementation milestone: port the proven hardware controls and add read-only device/capability discovery. Startup now reconciles the saved management choice for the embedded controller without restarting InputPlumber. Subsequent milestones require A8 testing of input, rumble, menu buttons and recovery paths.
 
 ## Identity
 

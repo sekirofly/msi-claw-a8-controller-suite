@@ -233,7 +233,7 @@ function Settings({page}:{page:'configs'|'templates'|'hardware'|'about'}) {
       {row(t('背键硬件模式可能影响独立 M1/M2 事件；不会自动更改。','Hardware back-button mode can affect independent M1/M2 events; it is never changed automatically.'))}
     </PanelSection><RumblePanel c={c}/></>}
     {page==='about'&&<PanelSection title={t('维护与诊断','Maintenance and diagnostics')}>
-      {row('0.1.0-alpha.2 · GPL-3.0-only')}
+      {row('0.1.0-alpha.3 · GPL-3.0-only')}
       {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
       {row(t('恢复：先到手柄设置停用管理。终端恢复和卸载方法见 README。','Recovery: disable management in device settings first. See README for terminal recovery and removal.'))}
       {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(

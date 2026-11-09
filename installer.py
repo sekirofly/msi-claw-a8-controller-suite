@@ -13,7 +13,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-VERSION = "0.1.0-alpha.2"
+VERSION = "0.1.0-alpha.3"
 REPO = "https://github.com/sekirofly/msi-claw-a8-controller-suite"
 NAME = "MSI Claw A8 Controller Suite"
 FOLDER = "msi-claw-a8-controller-suite"
