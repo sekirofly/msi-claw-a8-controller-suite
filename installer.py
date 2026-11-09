@@ -15,7 +15,7 @@ import urllib.error
 import time
 import zipfile
 
-VERSION = "0.1.0-alpha.13"
+VERSION = "0.1.0-alpha.14"
 REPO = "https://github.com/sekirofly/msi-claw-a8-controller-suite"
 NAME = "MSI Claw A8 Controller Suite"
 FOLDER = "msi-claw-a8-controller-suite"
@@ -218,7 +218,13 @@ def transact(home, action, staged=None, skip_restore=False):
     try:
         service('stop')
         stopped = True
-        restore_before_removal(home, staged, skip=skip_restore, fatal=(action == 'uninstall'))
+        # Only removing the plugin, or wiping the settings that hold the
+        # snapshot, needs the controller handed back first. A plain update or
+        # repair keeps both, and the new version re-applies on start, so it
+        # must not touch D-Bus: SetTargetDevices rebuilds every target object
+        # and made installs slow and flaky for no benefit.
+        if action in ('uninstall', 'reinstall'):
+            restore_before_removal(home, staged, skip=skip_restore, fatal=(action == 'uninstall'))
         for index, path in enumerate(paths):
             if path.exists():
                 saved = backup / str(index)
@@ -250,9 +256,10 @@ def transact(home, action, staged=None, skip_restore=False):
         cleanup = True
         raise
     finally:
-        # Preserve recovery material if rollback itself failed.
+        # Preserve recovery material if rollback itself failed. A cleanup failure
+        # must not turn a completed install into a reported one.
         if cleanup:
-            shutil.rmtree(backup)
+            shutil.rmtree(backup, ignore_errors=True)
 
 
 def main():

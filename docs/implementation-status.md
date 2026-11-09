@@ -1,5 +1,12 @@
 # Initial implementation status
 
+## Alpha.14: an update no longer touches the controller
+
+- ``transact`` only restores before ``uninstall`` and ``reinstall``. A plain ``install`` (update or repair) now stops Decky, replaces files and starts Decky: the new version re-applies on start, and the snapshot is untouched.
+- That removes the slow path entirely: no ``SetTargetDevices``, no read-back window, no retry loop, nothing that can produce a false failure during an update.
+- Uninstall keeps the hand-back, because the plugin and its snapshot disappear; clean reinstall keeps it because the snapshot is about to be wiped.
+- Test asserts an update runs no subprocess at all.
+
 ## Alpha.13: the restore no longer restarts its own rebuild
 
 - ``set_targets`` returns immediately when the target set already matches. Every ``SetTargetDevices`` call makes InputPlumber tear down and rebuild all target objects; writing an already-correct set started a rebuild the read-back then failed on, and the installer's retry restarted that rebuild, so the restore could never settle.
@@ -66,7 +73,7 @@ Editor entry explicitly focuses the copy-source control; returning restores the 
 
 The UI has two management choices: enabled and disabled. Fresh installs default to enabled; the backend reconciles without requiring an open panel. Boot and recognized original-state resets reapply Elite and selected mappings. Explicit disable persists before restoration, so failed recovery never re-enables on reboot; recovery errors remain visible with retry. Re-enabling preserves the first snapshot. Updates/repair preserve the choice; clean reinstall resets settings. Legacy active/paused snapshots migrate to enabled; legacy restored snapshots migrate to disabled. Unrelated live changes still stop writes and offer retry rather than requiring restore then enable. Device identity and capability gates remain enforced. Hardware validation is still required.
 
-2026-11-08, preview version 0.1.0-alpha.13. An installer is available for A8 testing; this is not a stable or device-validated release.
+2026-11-08, preview version 0.1.0-alpha.14. An installer is available for A8 testing; this is not a stable or device-validated release.
 
 Implemented: independent versioned default/game/template storage; strict embedded A8 discovery; serialized sysfs writes; finite 500 ms physical-device rumble test; capability-gated InputPlumber discovery, fixed Elite activation, durable recovery snapshot and terminal restore; English/Chinese quick panel and settings pages; independent copying and per-game selection; explicit save-versus-apply error handling.
 
