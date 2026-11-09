@@ -151,9 +151,12 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(len(list((self.home / ('.'+installer.FOLDER+'-recovery')).glob('*.json'))), 1)
 
     def test_install_update_preserves_configuration(self):
-        # An update keeps both the configuration and the snapshot: the new
-        # version re-applies from that snapshot instead of restoring first.
+        # An update keeps the configuration, the snapshot and the management
+        # choice untouched: the new version re-applies from that snapshot
+        # instead of restoring first, so nothing in settings is rewritten.
         snapshot = self.active_snapshot()
+        preference = snapshot.parent / 'management.json'
+        preference.write_text('{"enabled":false}')
         staged = self.home / 'stage'
         staged.mkdir()
         (staged / 'plugin.json').write_text(json.dumps({'name': installer.NAME}))
@@ -161,7 +164,7 @@ class InstallerTests(unittest.TestCase):
             installer.transact(self.home, 'install', staged)
         self.assertEqual((snapshot.parent / 'config.json').read_text(), '{"keep":"config"}')
         self.assertTrue(json.loads(snapshot.read_text())['active'])
-        self.assertTrue(json.loads((snapshot.parent / 'management.json').read_text())['enabled'])
+        self.assertFalse(json.loads(preference.read_text())['enabled'])
 
     def test_update_does_not_touch_the_controller(self):
         # A plain update replaces files only. Restoring first rebuilt every
