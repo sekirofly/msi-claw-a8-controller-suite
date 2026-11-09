@@ -1,5 +1,13 @@
 # Initial implementation status
 
+## Alpha.12: the rumble test actually runs, and the poll is gone
+
+- ``enqueue`` forwarded the previous promise value into the callable it ran, so ``test_rumble`` was invoked as ``test_rumble(undefined)``. Python raised ``takes 1 positional argument but 2 were given`` before the method body ran; Decky surfaced it only as "Python Exception". ``enqueue`` now calls with no arguments and the call site wraps the zero-argument callable.
+- The frontend test now asserts the exact argument list of the rumble call, which is what would have caught this.
+- The 5 second device poll is removed. Startup applies once with bounded retries (about 40 s, for a late InputPlumber), and afterwards only explicit changes apply: game switch, saved configuration, management toggle, manual retry. The target set survives suspend on the tested device, so polling bought nothing.
+- The panel reports drift (``consistent``) when the controller output no longer matches the snapshot, instead of silently disagreeing.
+- Diagnostics add ``pid``, process start time and ``rumble_test``, so a restarted plugin process is distinguishable from a failed call.
+
 ## Alpha.11: an unconfirmed restore no longer blocks installs
 
 - ``set_targets`` waits four seconds for the read-back and can run unconfirmed, so a slow InputPlumber transition no longer fails immediately.
@@ -51,7 +59,7 @@ Editor entry explicitly focuses the copy-source control; returning restores the 
 
 The UI has two management choices: enabled and disabled. Fresh installs default to enabled; the backend reconciles without requiring an open panel. Boot and recognized original-state resets reapply Elite and selected mappings. Explicit disable persists before restoration, so failed recovery never re-enables on reboot; recovery errors remain visible with retry. Re-enabling preserves the first snapshot. Updates/repair preserve the choice; clean reinstall resets settings. Legacy active/paused snapshots migrate to enabled; legacy restored snapshots migrate to disabled. Unrelated live changes still stop writes and offer retry rather than requiring restore then enable. Device identity and capability gates remain enforced. Hardware validation is still required.
 
-2026-11-08, preview version 0.1.0-alpha.11. An installer is available for A8 testing; this is not a stable or device-validated release.
+2026-11-08, preview version 0.1.0-alpha.12. An installer is available for A8 testing; this is not a stable or device-validated release.
 
 Implemented: independent versioned default/game/template storage; strict embedded A8 discovery; serialized sysfs writes; finite 500 ms physical-device rumble test; capability-gated InputPlumber discovery, fixed Elite activation, durable recovery snapshot and terminal restore; English/Chinese quick panel and settings pages; independent copying and per-game selection; explicit save-versus-apply error handling.
 

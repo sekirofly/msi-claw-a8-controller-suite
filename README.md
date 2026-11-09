@@ -1,6 +1,6 @@
 # MSI Claw A8 Controller Suite
 
-Alpha.11 no longer blocks installs when the pre-management state cannot be confirmed: the restore is retried three times, the target read-back window is four seconds, and a restore that still fails only warns for install and reinstall. Uninstall keeps refusing, because removing the plugin while the controller stays managed is not recoverable afterwards.
+Alpha.12 fixes the rumble test, which never ran: the frontend passed the previous promise value into a zero-argument callable, so Python raised before the method body executed and Decky showed only "Python Exception". It also removes the 5 second device poll (startup applies once with bounded retries, then only explicit changes apply) and reports controller drift instead of hiding it.
 
 > Alpha.3 uses two persistent management choices: enabled by default on first installation, or explicitly disabled until you enable it again. Startup restores the suite state automatically and preserves the first original snapshot.
 
@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md)
 
 A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / BZ2EM)**, combining the hardware controls from [MSI Claw A8 Back Buttons & Rumble](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble) with selected InputPlumber integration inspired by [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber).
 
-**Status: v0.1.0-alpha.11 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
+**Status: v0.1.0-alpha.12 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
 
 ## Install / update the preview
 
@@ -16,7 +16,7 @@ A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / B
 2. In SteamOS Desktop Mode, open Konsole and run as your normal desktop user:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.11/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.12/install.sh | bash
 ```
 
 3. **Save work and reboot before returning to Gaming Mode.** If vibration remains unavailable after reboot, an EC reset may help; follow [MSI's official EC reset guidance](https://www.msi.com/support/technical_details/HH_EC_Reset). EC reset is not required routinely and is never automated.
@@ -32,9 +32,9 @@ The Maintenance page provides repair (same version, keep configurations), clean 
 
 ```sh
 # Clean reinstall: restore input state, clear this suite's configurations, install again
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.11/install.sh | bash -s -- reinstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.12/install.sh | bash -s -- reinstall
 # Clean uninstall
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.11/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.12/install.sh | bash -s -- uninstall
 # Offline clean uninstall using installed code
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```
@@ -58,7 +58,7 @@ sudo bash ~/homebrew/plugins/msi-claw-a8-controller-suite/diagnostics.sh
 - Add M1/M2 and other A8 button mappings, then optional per-game mapping profiles after recovery is validated.
 - Provide Simplified Chinese and English interfaces, diagnostics, and explicit restore controls.
 
-The UI represents the actual A8 buttons, including M1/M2. Steam may still identify an Xbox Elite with four paddles. First automatic activation snapshots the original configuration and establishes Elite output only for the verified embedded controller. The backend reconciles independently of the panel; opening the panel adds no writes. Per-game changes only update mappings.
+The UI represents the actual A8 buttons, including M1/M2. Steam may still identify an Xbox Elite with four paddles. First automatic activation snapshots the original configuration and establishes Elite output only for the verified embedded controller. The backend applies the suite state once at startup, and again only on an explicit change: a game switch, a saved configuration, the management toggle or a retry. It does not poll the device; opening the panel adds no writes and only reports drift. Per-game changes only update mappings.
 
 ## Research and implementation plan
 

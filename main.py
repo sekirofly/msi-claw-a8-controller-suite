@@ -40,6 +40,7 @@ class Plugin:
         self.apply_error = None
         self.last_test = 0.0
         self.last_error = ''
+        self.started_at = time.strftime('%H:%M:%S')
         self.rumble_test = {'state': 'idle', 'code': '', 'detail': ''}
         self.call_log = collections.deque(maxlen=40)
         self.maintaining = False
@@ -101,12 +102,22 @@ class Plugin:
         state = {'config': self.store.snapshot(), 'game': self.game, 'game_name': self.game_name,
                  'applied': self.applied, 'apply_error': self.apply_error,
                  'managed': self.ip.enabled, 'last_error': self.last_error,
+                 'pid': os.getpid(), 'started': self.started_at,
                  'rumble_test': dict(self.rumble_test), 'call_log': list(self.call_log)[-8:]}
         for key, call in [('hardware', self.hardware.state), ('inputplumber', self.ip.status)]:
             try:
                 state[key] = call()
             except Exception as exc:
                 state[key + '_error'] = str(exc) if isinstance(exc, SuiteError) else 'interface_unavailable'
+        # Read-only drift check for the panel: report it, never fix it silently.
+        try:
+            snapshot = self.ip.snapshot or {}
+            expected = snapshot.get('targets')
+            actual = (state.get('inputplumber') or {}).get('targets')
+            state['consistent'] = (not self.ip.enabled) or (not snapshot.get('active')) \
+                or (expected is not None and actual == expected)
+        except Exception:
+            state['consistent'] = False
         try:
             state['can_test'] = len(rumble.candidates(self.hardware, self.hardware.discover())) == 1
         except Exception:
@@ -199,11 +210,20 @@ class Plugin:
         return await self.operation(change, 'set_management')
 
     async def _main(self):
-        # Independent of the panel/frontend: late devices, reboot and wake recover.
-        while not self.stopping.is_set():
-            await self.operation(self.apply_selected)
+        # One-shot activation at plugin load. InputPlumber can start after Decky,
+        # so retry for a bounded time (about 40 s) and then stop: later recovery
+        # comes from explicit events (game switch, saved settings, panel retry).
+        # The old 5 s device poll was removed: the target set survives suspend on
+        # the tested device, and every cycle cost several D-Bus calls a second.
+        for _ in range(20):
+            if self.stopping.is_set():
+                return
+            if not self.maintaining:
+                await self.operation(self.apply_selected, 'startup')
+                if not self.apply_error:
+                    return
             try:
-                await asyncio.wait_for(self.stopping.wait(), timeout=5)
+                await asyncio.wait_for(self.stopping.wait(), timeout=2)
             except asyncio.TimeoutError:
                 pass
 
@@ -241,6 +261,10 @@ class Plugin:
     async def _unload(self):
         # Updates/reloads must not reset hardware or destroy the recovery snapshot.
         self.stopping.set()
-        # Wait for an in-flight device write instead of interleaving with it.
-        await asyncio.to_thread(self.lock.acquire)
-        self.lock.release()
+        # Wait briefly for an in-flight device write, but never block shutdown:
+        # Decky kills a plugin that is still alive five seconds after the request.
+        try:
+            await asyncio.wait_for(asyncio.to_thread(self.lock.acquire), timeout=2)
+            self.lock.release()
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            pass
