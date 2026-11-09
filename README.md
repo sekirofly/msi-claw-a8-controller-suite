@@ -1,6 +1,6 @@
 # MSI Claw A8 Controller Suite
 
-Alpha.16 replaces historical snapshot restoration with installed system defaults. Management applies Elite and suite mappings; disabling restores the installed default profile and A8 targets.
+Alpha.17 clarifies the quick-panel summary, labels back buttons Left M2 / Right M1, and makes the summary focusable with top-of-panel scrolling. Installer messages distinguish file installation, saved management choice and preserved hardware mode/rumble strengths.
 
 > Fresh installs default to enabled. Explicit disable persists across reboot until enabled again. Restoration means system defaults, not another plugin’s or an earlier custom configuration.
 
@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md)
 
 A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / BZ2EM)**, combining the hardware controls from [MSI Claw A8 Back Buttons & Rumble](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble) with selected InputPlumber integration inspired by [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber).
 
-**Status: v0.1.0-alpha.16 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
+**Status: v0.1.0-alpha.17 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
 
 ## Install / update the preview
 
@@ -16,11 +16,11 @@ A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / B
 2. In SteamOS Desktop Mode, open Konsole and run as your normal desktop user:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.16/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.17/install.sh | bash
 ```
 
 3. **Save work and reboot before returning to Gaming Mode.** If vibration remains unavailable after reboot, an EC reset may help; follow [MSI's official EC reset guidance](https://www.msi.com/support/technical_details/HH_EC_Reset). EC reset is not required routinely and is never automated.
-4. Open the suite, inspect device status, and first test rumble at a modest strength. Management starts enabled and applies automatically once the embedded A8 is identified. Test a simple M1 mapping, then test **Restore system defaults and disable**. This choice persists across reboot; **Enable management** resumes automatic management.
+4. Open the suite, inspect device status, and first test rumble at a modest strength. Management starts enabled and applies automatically once the embedded A8 is identified. Test a simple Right M1 mapping, then test **Restore system defaults and disable**. This choice persists across reboot; **Enable management** resumes automatic management.
 
 The installer checks the version-pinned ZIP and SHA-256 checksum, then briefly restarts Decky. It never restarts InputPlumber. A checksum detects corruption, not an independently signed release. Normal install/update retains configurations without restoring the controller first, then resumes the saved enabled/disabled choice. Keyboard and mouse are useful while testing controller configuration.
 
@@ -32,9 +32,9 @@ The Maintenance page provides repair (same version, keep configurations), clean 
 
 ```sh
 # Clean reinstall: clear mappings, retain enabled/disabled choice, install again
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.16/install.sh | bash -s -- reinstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.17/install.sh | bash -s -- reinstall
 # Clean uninstall
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.16/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.17/install.sh | bash -s -- uninstall
 # Offline clean uninstall using installed code
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```
@@ -57,10 +57,10 @@ sudo bash ~/homebrew/plugins/msi-claw-a8-controller-suite/diagnostics.sh
 - Keep the existing three hardware back-button modes and independent left/right rumble strength controls.
 - Uniquely identify the embedded A8 controller and its InputPlumber capabilities; never target Bluetooth or USB external controllers.
 - Use a fixed Xbox Elite output internally, with an A8-native button interface and no virtual-controller type selector.
-- Add M1/M2 and other A8 button mappings, then optional per-game mapping profiles after recovery is validated.
+- Add Left M2 / Right M1 and other A8 button mappings, then optional per-game mapping profiles after recovery is validated.
 - Provide Simplified Chinese and English interfaces, diagnostics, and explicit restore controls.
 
-The UI represents the actual A8 buttons, including M1/M2. Steam may still identify an Xbox Elite with four paddles. First automatic activation snapshots the original configuration and establishes Elite output only for the verified embedded controller. The backend applies the suite state once at startup, and again only on an explicit change: a game switch, a saved configuration, the management toggle or a retry. It does not poll the device; opening the panel adds no writes and only reports drift. Per-game changes only update mappings.
+The UI represents the actual A8 buttons, including Left M2 / Right M1. Steam may still identify an Xbox Elite with four paddles. First automatic activation snapshots the original configuration and establishes Elite output only for the verified embedded controller. The backend applies the suite state once at startup, and again only on an explicit change: a game switch, a saved configuration, the management toggle or a retry. It does not poll the device; opening the panel adds no writes and only reports drift. Per-game changes only update mappings.
 
 ## Research and implementation plan
 

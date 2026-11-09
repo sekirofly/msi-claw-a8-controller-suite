@@ -23,10 +23,11 @@ const testRumble = callable<[], Result<boolean>>('test_rumble');
 const manage = callable<[boolean], Result<State>>('set_management');
 const maintenance = callable<[string], Result<boolean>>('maintenance');
 const reportGame = callable<[string | null, string], Result<unknown>>('report_game');
-const buttons = ['M1','M2','A','B','X','Y','LB','RB','LS','RS','Up','Down','Left','Right','Menu','View'];
+const buttons = ['M2','M1','A','B','X','Y','LB','RB','LS','RS','Up','Down','Left','Right','Menu','View'];
 const keys = ['Space','Enter','Esc','Tab','LeftShift','LeftCtrl','LeftAlt', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
 const outputs = [...buttons, ...keys.map(k => 'key:Key'+k), 'mouse:Left','mouse:Right','mouse:Middle'];
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
+const buttonLabel = (key: string) => key==='M2'?t('左 M2','Left M2'):key==='M1'?t('右 M1','Right M1'):key;
 
 function errorText(code?: string): string {
   const messages: Record<string, [string,string]> = {
@@ -116,8 +117,8 @@ function confirm(title: string, description: string, action: () => void) {
   showModal(<ConfirmModal strTitle={title} strDescription={description} strOKButtonText={t('确认','Confirm')}
     strCancelButtonText={t('取消','Cancel')} onOK={action}/>);
 }
-function Header({c}: {c: Controller}) {
-  return <PanelSection title="MSI Claw A8 Controller Suite">
+function Header({c,compact=false}: {c: Controller; compact?: boolean}) {
+  return <PanelSection title={compact?undefined:"MSI Claw A8 Controller Suite"}>
     {row(c.error || (c.state
       ? t('仅管理 A8 内置手柄','Embedded A8 controller only')+' · '
         +(c.state.managed?t('管理已启用','Management enabled'):t('管理已停用','Management disabled'))
@@ -194,7 +195,7 @@ function FocusEntry({active,children}: {active:boolean;children:React.ReactNode}
   return <Focusable ref={ref} flow-children="column" preferredFocus={active} noFocusRing>{children}</Focusable>;
 }
 const mappingGroups = [
-  {zh:'背键',en:'Back buttons',rows:[['M1','M2']]},
+  {zh:'背键',en:'Back buttons',rows:[['M2','M1']]},
   {zh:'动作键',en:'Face buttons',rows:[['A','B'],['X','Y']]},
   {zh:'方向键',en:'D-pad',rows:[['Up','Down'],['Left','Right']]},
   {zh:'肩键',en:'Shoulder buttons',rows:[['LB','RB']]},
@@ -240,8 +241,8 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
         <div style={{fontSize:14,fontWeight:600,margin:'8px 0'}}>{t(group.zh,group.en)}</div>
         {group.rows.map(pair=><Focusable key={pair.join('-')} flow-children="row" style={{display:'flex',gap:12}}>
           {pair.map(b=><div key={b} style={{flex:'1 1 0',minWidth:0}}>
-            <DropdownItem layout="below" label={b} description={c.state?.inputplumber?.sources.includes(b)?undefined:t('输入待验证','Input unverified')}
-              selectedOption={rules[b]?.[0]??'unchanged'} rgOptions={[{data:'unchanged',label:t('保持基础映射','Keep base mapping')},{data:'disabled',label:t('不输出','No output')},...outputs.map(o=>({data:o,label:o}))]}
+            <DropdownItem layout="below" label={buttonLabel(b)} description={c.state?.inputplumber?.sources.includes(b)?undefined:t('输入待验证','Input unverified')}
+              selectedOption={rules[b]?.length===0?'disabled':rules[b]?.[0]??'unchanged'} rgOptions={[{data:'unchanged',label:t('保持基础映射','Keep base mapping')},{data:'disabled',label:t('不输出','No output')},...outputs.map(o=>({data:o,label:buttonLabel(o)}))]}
               onChange={(v:{data:string})=>{const next=clone(rules);if(v.data==='unchanged')delete next[b];else next[b]=v.data==='disabled'?[]:[v.data];setRules(next);setDirty(true);}}/>
           </div>)}
         </Focusable>)}
@@ -263,20 +264,48 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
 let requestedScope: {scope:string;name:string}|undefined;
 function QuickPanel() {
   const c=useController(); const s=c.state;
+  const top=useRef<HTMLDivElement>(null);
+  const frame=useRef(0);
+  useEffect(()=>()=>cancelAnimationFrame(frame.current),[]);
+  function revealTop() {
+    cancelAnimationFrame(frame.current);
+    // Run after Steam's focus scrolling, so it cannot leave the status above
+    // the viewport. Merely refreshing status must never move focus or scroll.
+    frame.current=requestAnimationFrame(()=>{
+      frame.current=requestAnimationFrame(()=>top.current?.scrollIntoView({block:'start',behavior:'auto'}));
+    });
+  }
   const game=s?.game && s.game!=='default'?s.game:undefined;
   const scope=s?.applied;
   const rules=scope==='default'?s?.config.default:scope?s?.config.games[scope]?.rules:undefined;
+  const current=!s?.managed?t('管理已停用','Management disabled'):
+    scope==='default'?t('默认按键','Default buttons'):
+    scope?s?.config.games[scope]?.name??scope:t('尚未生效','Not applied');
+  function outputLabel(key:string) {
+    const outputs=rules?.[key];
+    return outputs===undefined?t('系统默认映射','System default mapping'):
+      outputs.length?outputs.map(buttonLabel).join(' + '):t('不输出','No output');
+  }
   function open(scope?:string,name?:string) {
     requestedScope=scope?{scope,name:name??''}:undefined;
     Navigation.Navigate(route);Navigation.CloseSideMenus();
   }
-  return <><Header c={c}/>{s&&<PanelSection title={t('当前按键','Current buttons')}>
-    {row(game?s.game_name:t('未运行游戏 / 尚未确认','No running game / not yet confirmed'))}
-    {row(!s.managed?t('按键管理未启用','Mapping management is not enabled'):scope==='default'?t('默认按键','Default buttons'):scope?s.config.games[scope]?.name??scope:t('尚未确认生效','Not confirmed applied'))}
-    {['M1','M2'].map(b=>row(`${b} → ${rules?.[b]?.join(' + ') || t('基础映射 / 未确认','Base mapping / unconfirmed')}`))}
-    <PanelSectionRow><ButtonItem disabled={c.busy||s.game===null} onClick={()=>open(game??'default',game?s.game_name:t('默认按键','Default buttons'))}>
+  return <><div ref={top}><Header c={c} compact/>{s&&<PanelSection>
+    <PanelSectionRow>
+      <Focusable tabIndex={0} role="group" aria-label={t('当前按键摘要','Current button summary')}
+        onFocus={revealTop} onGamepadFocus={revealTop}
+        style={{padding:'10px 4px',lineHeight:1.5,overflowWrap:'anywhere'}}>
+        <div style={{fontSize:16,fontWeight:600}}>{t('当前按键：','Current buttons: ')+current}</div>
+        {game&&<div style={{fontSize:13,marginTop:4}}>{t('游戏：','Game: ')+(s.game_name||game)}</div>}
+        {s.game===null&&<div style={{fontSize:13,marginTop:4}}>{t('正在读取游戏状态，暂不切换配置','Reading game status; keeping the current configuration')}</div>}
+        {s.managed&&rules&&<div style={{fontSize:14,marginTop:8}}>
+          {['M2','M1'].map(key=><div key={key}>{buttonLabel(key)+' → '+outputLabel(key)}</div>)}
+        </div>}
+      </Focusable>
+    </PanelSectionRow>
+    <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>open(game??'default',game?s.game_name:t('默认按键','Default buttons'))}>
       {game?(s.config.games[game]?t('编辑：','Edit: '):t('为本游戏单独设置：','Customize this game: '))+s.game_name:t('编辑默认按键','Edit default buttons')}</ButtonItem></PanelSectionRow>
-  </PanelSection>}<RumblePanel c={c}/><PanelSection><PanelSectionRow><ButtonItem onClick={()=>open()}>{t('打开设置','Open settings')}</ButtonItem></PanelSectionRow></PanelSection></>;
+  </PanelSection>}</div><RumblePanel c={c}/><PanelSection><PanelSectionRow><ButtonItem onClick={()=>open()}>{t('打开设置','Open settings')}</ButtonItem></PanelSectionRow></PanelSection></>;
 }
 
 function Settings({page}:{page:'configs'|'hardware'|'about'}) {
@@ -323,7 +352,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.16 · GPL-3.0-only')}
+        {row('0.1.0-alpha.17 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {row(t('恢复：先在上方插件管理停用管理。终端恢复和卸载方法见 README。','Recovery: disable management in the section above first. See README for terminal recovery and removal.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
