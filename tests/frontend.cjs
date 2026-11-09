@@ -48,6 +48,9 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     assert.doesNotMatch(json,/未运行游戏 \/ 尚未确认|基础映射 \/ 未确认/);
     const summary=rendered.root.findAllByType('Focusable').find(x=>x.props.tabIndex===0);
     assert.ok(summary,'summary participates in focus navigation');
+    assert.equal(rendered.root.findAllByType('Focusable').filter(x=>x.props.tabIndex===0).length,1,'one summary stop, not one per line');
+    assert.equal(summary.findAllByType('Focusable').length,1,'summary has no nested focus stops');
+    assert.doesNotMatch(json,/MSI Claw A8 Controller Suite|仅管理 A8|Embedded A8 controller only/);
     assert.equal(typeof summary.props.onGamepadFocus,'function');
     const saved=JSON.parse(JSON.stringify(state));
     for(const scenario of [
@@ -104,6 +107,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       const hardwarePage=navigation.root.findByType('SidebarNavigation').props.pages[2].content;
       await act(async()=>{settings=create(hardwarePage)});
       const text=JSON.stringify(settings.toJSON());
+      assert.doesNotMatch(text,/MSI Claw A8 Controller Suite/,'outer navigation owns the plugin title');
       assert.doesNotMatch(text,/请恢复后重新启用|Restore before enabling again/);
       assert.match(text,language==='zh-CN'?/尚未生效/:/Not applied/);
       const retry=settings.root.findAllByType('ButtonItem').find(x=>['重试','Retry'].includes(x.props.children));
@@ -121,6 +125,10 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
         await act(async()=>{device=create(pages[1].content)});
         const deviceText=JSON.stringify(device.toJSON());
         assert.match(deviceText,language==='zh-CN'?/背键硬件模式/:/Back-button hardware mode/);
+        assert.doesNotMatch(deviceText,/MSI Claw A8 Controller Suite|当前：|Current: /);
+        assert.ok(device.root.findAllByType('PanelSection').some(x=>x.props.title===(language==='zh-CN'?'震动':'Rumble')));
+        assert.ok(deviceText.includes(language==='zh-CN'?'本页设置对所有游戏生效':'Settings on this page apply to all games'));
+        assert.equal(device.root.findAllByType('Focusable').filter(x=>x.props.tabIndex===0).length,0);
         assert.doesNotMatch(deviceText,language==='zh-CN'?/恢复系统默认/:/Restore system defaults/);
       } finally {await act(async()=>{device?.unmount()});}
       for(const pageIndex of [0]) {
@@ -130,6 +138,10 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
           await act(async()=>{editor=create(page,{createNodeMock:element=>element.type==='Focusable'?{
             querySelector:()=>({focus:()=>focused.push('control')})
           }:null})});
+          const configText=JSON.stringify(editor.toJSON());
+          assert.doesNotMatch(configText,/MSI Claw A8 Controller Suite/);
+          assert.ok(configText.includes(language==='zh-CN'?'管理已停用；修改可保存':'Management disabled; edits can be saved'));
+          assert.equal(editor.root.findAllByType('PanelSection').filter(x=>x.props.title===(language==='zh-CN'?'按键配置':'Button configurations')).length,0);
           const label=language==='zh-CN'?'编辑默认按键':'Edit default buttons';
           const open=()=>editor.root.findAllByType('ButtonItem').find(x=>x.props.children===label);
           await act(async()=>{open().props.onClick()});
