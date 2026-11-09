@@ -1,5 +1,13 @@
 # Initial implementation status
 
+## Alpha.10: recovery can no longer deadlock an install
+
+- `targets()` skips a target object that vanished between listing and reading its type. InputPlumber rebuilds target devices during a restore, so one missing object used to abort the whole restore with a `CalledProcessError` traceback.
+- `Bus.run` converts a failing or timed out `busctl` into `interface_unavailable`, so failures reach the UI as a retryable state instead of a raw traceback.
+- The installer retries restoration once, and runs the freshly unpacked `recover.py` rather than the installed copy: an installed version with this bug could otherwise block every future reinstall.
+- `--skip-restore` is documented as a last resort; the snapshot is kept and the controller stays managed.
+- Device validation of the actual rumble pulse is still pending.
+
 ## Alpha.9: stale error no longer blocks the rumble test
 
 - `flushRumble()` only reports an error for a save it actually attempted. It used to return the previous chain with a module-level `writeError` that was cleared only when a slider moved, so one failed save made every later test fail with "rumble value not saved".
@@ -36,7 +44,7 @@ Editor entry explicitly focuses the copy-source control; returning restores the 
 
 The UI has two management choices: enabled and disabled. Fresh installs default to enabled; the backend reconciles without requiring an open panel. Boot and recognized original-state resets reapply Elite and selected mappings. Explicit disable persists before restoration, so failed recovery never re-enables on reboot; recovery errors remain visible with retry. Re-enabling preserves the first snapshot. Updates/repair preserve the choice; clean reinstall resets settings. Legacy active/paused snapshots migrate to enabled; legacy restored snapshots migrate to disabled. Unrelated live changes still stop writes and offer retry rather than requiring restore then enable. Device identity and capability gates remain enforced. Hardware validation is still required.
 
-2026-11-08, preview version 0.1.0-alpha.9. An installer is available for A8 testing; this is not a stable or device-validated release.
+2026-11-08, preview version 0.1.0-alpha.10. An installer is available for A8 testing; this is not a stable or device-validated release.
 
 Implemented: independent versioned default/game/template storage; strict embedded A8 discovery; serialized sysfs writes; finite 500 ms physical-device rumble test; capability-gated InputPlumber discovery, fixed Elite activation, durable recovery snapshot and terminal restore; English/Chinese quick panel and settings pages; independent copying and per-game selection; explicit save-versus-apply error handling.
 

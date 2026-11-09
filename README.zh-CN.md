@@ -1,6 +1,6 @@
 # MSI Claw A8 Controller Suite
 
-Alpha.9 修复震动测试被旧的保存错误拦住的问题：面板不再把上一次失败带到下一次，滑动保存失败与测试失败分开显示，并且每次后端调用都会记到 `settings/calls.log`（诊断页也显示），即使失败发生在调用桥也能留下证据。
+Alpha.10 修复安装/重装被恢复失败卡住的问题：InputPlumber 重建目标设备时短暂消失的对象会被跳过而不再中止，busctl 失败转为可重试的错误，安装器重试一次，并改用刚解包的新代码执行恢复，而不是可能带 bug 的已安装副本。``--skip-restore`` 作为最后手段。
 
 > Alpha.3 采用两状态管理：首次安装默认启用，重启及会话恢复后自动重新应用；主动停用后一直停用，直到再次启用。首次接管前快照不覆盖。
 
@@ -8,7 +8,7 @@ Alpha.9 修复震动测试被旧的保存错误拦住的问题：面板不再把
 
 面向 **MSI Claw A8（AMD Ryzen Z2 Extreme / BZ2EM）** 的综合 Decky 手柄管理插件项目。计划继承现有[背键与震动插件](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble)的硬件控制功能，结合 [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber) 的部分 InputPlumber 管理思路。
 
-**v0.1.0-alpha.9 为可安装预览版，供 A8 实机测试；不是稳定版，新增功能尚未经真机验证。** 现有小插件继续独立维护。第一阶段只针对 A8，不把 Claw 8 AI+ 等其他型号当作已兼容设备。本项目非 MSI 官方产品。
+**v0.1.0-alpha.10 为可安装预览版，供 A8 实机测试；不是稳定版，新增功能尚未经真机验证。** 现有小插件继续独立维护。第一阶段只针对 A8，不把 Claw 8 AI+ 等其他型号当作已兼容设备。本项目非 MSI 官方产品。
 
 ## 安装与更新
 
@@ -16,7 +16,7 @@ Alpha.9 修复震动测试被旧的保存错误拦住的问题：面板不再把
 2. 在 SteamOS 桌面模式的 Konsole，以普通用户运行：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.9/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.10/install.sh | bash
 ```
 
 3. **安装后保存工作并重启，再回游戏模式。** 若重启后仍有震动消失，可按 [MSI 官方 EC 重置说明](https://www.msi.com/support/technical_details/HH_EC_Reset)恢复；不需要每次都做，插件不会自动重置。
@@ -32,14 +32,14 @@ curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-su
 
 ```sh
 # 干净重装，会清除本插件的按键配置
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.9/install.sh | bash -s -- reinstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.10/install.sh | bash -s -- reinstall
 # 干净卸载
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.9/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.10/install.sh | bash -s -- uninstall
 # 离线卸载
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```
 
-先停止 Decky，恢复接管前的 InputPlumber 输出与映射，再删除本插件文件。恢复失败就中止并保留文件与快照。不会重置硬件背键模式和震动，不删除其他插件；应急快照有意保留在 `~/homebrew/.msi-claw-a8-controller-suite-recovery/`，共享 Decky 记录和系统日志不清除。
+先停止 Decky，恢复接管前的 InputPlumber 输出与映射，再删除本插件文件。恢复失败就中止并保留文件与快照；安装器会重试一次，因为 InputPlumber 重建目标设备时可能让某个对象短暂消失。最后手段是 `--skip-restore`（例如 `bash -s -- reinstall --skip-restore`）：不恢复接管前状态而直接替换文件，手柄仍处于被接管状态，快照保留以便之后手动恢复。不会重置硬件背键模式和震动，不删除其他插件；应急快照有意保留在 `~/homebrew/.msi-claw-a8-controller-suite-recovery/`，共享 Decky 记录和系统日志不清除。
 
 默认 Decky 目录为 `~/homebrew`。自定义目录在末尾 `bash` 后加 `-s -- install --decky-home /绝对路径/homebrew`，按需替换动作。不要以 root 启动默认安装命令。
 

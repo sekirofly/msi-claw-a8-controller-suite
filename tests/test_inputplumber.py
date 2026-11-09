@@ -1,8 +1,11 @@
 import copy
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from backend.inputplumber import InputPlumber, IFACE
+from backend.inputplumber import Bus as PlumberBus
 from backend.config import SuiteError, BUTTONS
 
 
@@ -198,3 +201,22 @@ class InputTests(unittest.TestCase):
         self.ip.enable();self.bus.calls=[]
         self.ip.apply({'M1':['A']});self.ip.apply({'M1':['B']})
         self.assertFalse(any(name=='SetTargetDevices' for _,name in self.bus.calls))
+
+    def test_disappearing_target_object_is_skipped(self):
+        # InputPlumber can drop a target object between listing it and reading
+        # its type; that must not fail targets() and, with it, a restore.
+        original = self.bus.property
+        def property_(path, interface, name):
+            if name == 'TargetDevices':
+                return ['/compositeA8/target/a', '/compositeA8/target/gone']
+            if path == '/compositeA8/target/gone':
+                raise SuiteError('interface_unavailable')
+            return original(path, interface, name)
+        self.bus.property = property_
+        self.assertEqual(self.ip.targets('/compositeA8'), ['/compositeA8/target/a'])
+
+    def test_busctl_failure_becomes_suite_error(self):
+        for error in (subprocess.CalledProcessError(1, ['busctl']), subprocess.TimeoutExpired('busctl', 5)):
+            with patch('backend.inputplumber.subprocess.run', side_effect=error):
+                with self.assertRaisesRegex(SuiteError, 'interface_unavailable'):
+                    PlumberBus().run('get-property', 'x')
