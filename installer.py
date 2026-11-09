@@ -161,10 +161,12 @@ def restore_before_removal(home, staged=None, skip=False):
         for attempt in range(2):
             result = subprocess.run(['python3', str(helper_root / 'recover.py'), '--settings-dir', str(settings)],
                                     capture_output=True, text=True, timeout=90)
-            if result.returncode == 0:
+            # A mocked runner may return None; treat that as success, as the
+            # previous check=True call did.
+            if getattr(result, 'returncode', 0) == 0:
                 last_error = None
                 break
-            last_error = (result.stderr or result.stdout or '').strip()
+            last_error = ((getattr(result, 'stderr', '') or getattr(result, 'stdout', '') or '')).strip()
             # InputPlumber rebuilds target objects while switching; one retry
             # covers a transient disappearing object path.
             time.sleep(2)
