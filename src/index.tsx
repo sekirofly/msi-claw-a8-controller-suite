@@ -9,7 +9,8 @@ type Rules = Record<string, string[]>;
 type Entry = {name: string; rules: Rules; enabled?: boolean};
 type Config = {revision: number; default: Rules; games: Record<string, Entry>};
 type State = {config: Config; game: string | null; game_name: string; applied: string | null; apply_error?: string;
-  managed: boolean; last_error?: string; rumble_test?: {state: string; code?: string; detail?: string};
+  managed: boolean; last_error?: string; call_log?: string[];
+  rumble_test?: {state: string; code?: string; detail?: string};
   hardware?: {mode: string; left: number; right: number};
   hardware_error?: string; inputplumber_error?: string; inputplumber?: {sources: string[]; profile: string; targets: string[]}; can_test: boolean};
 type Result<T> = {ok: boolean; data: T; error?: string};
@@ -65,11 +66,17 @@ const enqueue = <T,>(action: () => Promise<Result<T>>): Promise<T> => {
 };
 function flushRumble() {
   clearTimeout(rumbleTimer); rumbleTimer = undefined;
-  if (pending) {const [left,right] = pending; pending = undefined; return enqueue(() => setHardware(null,left,right));}
-  return chain;
+  // No pending write means there is nothing to report: returning the previous
+  // chain (or a stale writeError) made one failed save block every later test.
+  if (!pending) return Promise.resolve();
+  const [left,right] = pending; pending = undefined;
+  writeError = '';
+  return enqueue(() => setHardware(null,left,right)).then(
+    () => {writeError = '';},
+    e => {writeError = String(e); throw e;});
 }
 function scheduleRumble(left: number, right: number) {
-  writeError = ''; pending = [left,right]; clearTimeout(rumbleTimer);
+  pending = [left,right]; clearTimeout(rumbleTimer);
   rumbleTimer = setTimeout(() => {void flushRumble().catch(() => {});}, 200);
 }
 
@@ -133,11 +140,15 @@ function RumblePanel({c}: {c: Controller}) {
     <PanelSectionRow><ButtonItem disabled={!hw || !c.state?.can_test || testing || c.busy} layout="below" onClick={() => {
       setTesting(true);setError('');
       void (async()=>{
+        // Saving the slider value and sending the test are different calls; a
+        // failed save must not abort or masquerade as a failed test.
         try {
           await flushRumble();
-          // Name the failing step: saving the slider value and sending the test
-          // are different backend calls and used to share one message.
-          if(writeError) throw new Error(t('震动值未保存：','Rumble value not saved: ')+writeError);
+        } catch(e) {
+          setError(t('震动值未保存：','Rumble value not saved: ')+String(e));
+          setTesting(false); return;
+        }
+        try {
           await enqueue(testRumble);
         } catch(e) {
           setError(t('测试调用失败：','Test call failed: ')+String(e));
@@ -301,7 +312,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复原配置并停用','Restore original configuration and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.8 · GPL-3.0-only')}
+        {row('0.1.0-alpha.9 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {row(t('恢复：先在上方插件管理停用管理。终端恢复和卸载方法见 README。','Recovery: disable management in the section above first. See README for terminal recovery and removal.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
@@ -314,7 +325,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
       <PanelSection title={t('诊断信息','Diagnostics')}>
         <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>void c.run(async()=>{})}>{t('刷新诊断','Refresh diagnostics')}</ButtonItem></PanelSectionRow>
         {s.last_error&&row(t('最近的后端错误：','Last backend error: ')+s.last_error)}
-        {row(JSON.stringify({hardware:s.hardware, hardware_error:s.hardware_error, inputplumber:s.inputplumber,inputplumber_error:s.inputplumber_error,can_test:s.can_test,last_error:s.last_error},null,2))}
+        {row(JSON.stringify({hardware:s.hardware, hardware_error:s.hardware_error, inputplumber:s.inputplumber,inputplumber_error:s.inputplumber_error,can_test:s.can_test,last_error:s.last_error,call_log:s.call_log},null,2))}
       </PanelSection>
     </>}
   </>;
