@@ -1,6 +1,6 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {ButtonItem, PanelSection, PanelSectionRow, SliderField, ToggleField, DropdownItem, TextField,
-  ConfirmModal, showModal, Navigation, Router, SidebarNavigation} from '@decky/ui';
+  ConfirmModal, showModal, Navigation, Router, SidebarNavigation, Focusable} from '@decky/ui';
 import {callable, definePlugin, routerHook} from '@decky/api';
 
 const route = '/msi-claw-a8-controller-suite';
@@ -135,6 +135,32 @@ function RumblePanel({c}: {c: Controller}) {
   </PanelSection>;
 }
 
+// Transfer focus only on an explicit view transition, never on status refreshes.
+function FocusEntry({active,children}: {active:boolean;children:React.ReactNode}) {
+  const ref=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!active)return;
+    let frame=0;
+    frame=requestAnimationFrame(()=>{frame=requestAnimationFrame(()=>{
+      const root=ref.current;
+      const target=root?.querySelector<HTMLElement>('button:not(:disabled), [role="button"]:not([aria-disabled="true"])')
+        ?? root?.querySelector<HTMLElement>('select:not(:disabled), input:not(:disabled)')
+        ?? root?.querySelector<HTMLElement>('[tabindex="0"]');
+      target?.focus();
+    });});
+    return ()=>cancelAnimationFrame(frame);
+  },[active]);
+  return <Focusable ref={ref} flow-children="column" preferredFocus={active} noFocusRing>{children}</Focusable>;
+}
+const mappingGroups = [
+  {zh:'背键',en:'Back buttons',rows:[['M1','M2']]},
+  {zh:'动作键',en:'Face buttons',rows:[['A','B'],['X','Y']]},
+  {zh:'方向键',en:'D-pad',rows:[['Up','Down'],['Left','Right']]},
+  {zh:'肩键',en:'Shoulder buttons',rows:[['LB','RB']]},
+  {zh:'摇杆按下',en:'Stick clicks',rows:[['LS','RS']]},
+  {zh:'菜单键',en:'Menu buttons',rows:[['View','Menu']]},
+];
+
 function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: string; onClose: () => void}) {
   const config=c.state!.config;
   const entry = scope==='default'?undefined:scope.startsWith('template:')?config.templates[scope.slice(9)]:config.games[scope];
@@ -152,7 +178,8 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
     const copied=source==='default'?config.default:source.startsWith('template:')?config.templates[source.slice(9)].rules:config.games[source].rules;
     setRules(clone(copied));setDirty(true);
   }
-  return <>
+  const close=()=>dirty?confirm(t('放弃未保存修改？','Discard unsaved changes?'),t('已保存的配置保持不变。','Saved configuration stays unchanged.'),onClose):onClose();
+  return <Focusable flow-children="column" onCancel={e=>{e.stopPropagation();close();}}>
     <PanelSection title={t('正在编辑：','Editing: ')+(scope==='default'?t('默认按键','Default buttons'):title)}>
       {row(scope==='default'?t('影响使用默认按键的游戏，不影响独立副本。','Affects games using defaults, not independent copies.'):
         template?t('模板修改不会影响已有游戏配置。','Template edits do not change existing game configurations.'):
@@ -161,13 +188,20 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
       {template&&<PanelSectionRow><TextField label={t('模板名称','Template name')} value={title} onChange={e=>{setTitle(e.target.value);setDirty(true);}}/></PanelSectionRow>}
       {scope!=='default'&&!template&&<PanelSectionRow><ToggleField label={t('使用本游戏专用按键','Use this game’s custom buttons')} checked={enabled}
         onChange={v=>{setEnabled(v);setDirty(true);}}/></PanelSectionRow>}
-      <PanelSectionRow><DropdownItem label={t('复制来源','Copy from')} selectedOption={source} rgOptions={choices} onChange={(v:{data:string})=>setSource(v.data)}/></PanelSectionRow>
+      <FocusEntry active><PanelSectionRow><DropdownItem label={t('复制来源','Copy from')} selectedOption={source} rgOptions={choices} onChange={(v:{data:string})=>setSource(v.data)}/></PanelSectionRow></FocusEntry>
       <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>confirm(t('替换编辑草稿','Replace draft'),t('复制后互不关联；保存前不改变已有配置。','Copies are independent. Existing settings change only after saving.'),copySource)}>{t('复制到此草稿','Copy into this draft')}</ButtonItem></PanelSectionRow>
     </PanelSection>
     <PanelSection title={t('按键映射','Button mappings')}>
-      {buttons.map(b=><PanelSectionRow key={b}><DropdownItem label={b} description={c.state?.inputplumber?.sources.includes(b)?undefined:t('输入尚未确认；保存不代表硬件支持','Input not confirmed; saving does not establish hardware support')}
-        selectedOption={rules[b]?.[0]??'unchanged'} rgOptions={[{data:'unchanged',label:t('保持基础映射','Keep base mapping')},{data:'disabled',label:t('不输出','No output')},...outputs.map(o=>({data:o,label:o}))]}
-        onChange={(v:{data:string})=>{const next=clone(rules);if(v.data==='unchanged')delete next[b];else next[b]=v.data==='disabled'?[]:[v.data];setRules(next);setDirty(true);}}/></PanelSectionRow>)}
+      {mappingGroups.map(group=><div key={group.en} style={{marginBottom:12}}>
+        <div style={{fontSize:14,fontWeight:600,margin:'8px 0'}}>{t(group.zh,group.en)}</div>
+        {group.rows.map(pair=><Focusable key={pair.join('-')} flow-children="row" style={{display:'flex',gap:12}}>
+          {pair.map(b=><div key={b} style={{flex:'1 1 0',minWidth:0}}>
+            <DropdownItem layout="below" label={b} description={c.state?.inputplumber?.sources.includes(b)?undefined:t('输入待验证','Input unverified')}
+              selectedOption={rules[b]?.[0]??'unchanged'} rgOptions={[{data:'unchanged',label:t('保持基础映射','Keep base mapping')},{data:'disabled',label:t('不输出','No output')},...outputs.map(o=>({data:o,label:o}))]}
+              onChange={(v:{data:string})=>{const next=clone(rules);if(v.data==='unchanged')delete next[b];else next[b]=v.data==='disabled'?[]:[v.data];setRules(next);setDirty(true);}}/>
+          </div>)}
+        </Focusable>)}
+      </div>)}
       {row(t('Guide/QAM 入口受保护。摇杆和扳机轴保持原始行为。','Guide/QAM are protected. Stick and trigger axes keep their original behavior.'))}
     </PanelSection>
     <PanelSection>
@@ -177,9 +211,9 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
         if(r.apply_error) throw new Error(t('已保存，未生效：','Saved, not applied: ')+errorText(r.apply_error));
         setDirty(false);onClose();
       })}>{scope==='default'?t('保存默认按键','Save default buttons'):t('保存到：','Save to: ')+title}</ButtonItem></PanelSectionRow>
-      <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>dirty?confirm(t('放弃未保存修改？','Discard unsaved changes?'),t('已保存的配置保持不变。','Saved configuration stays unchanged.'),onClose):onClose()}>{t('返回','Back')}</ButtonItem></PanelSectionRow>
+      <PanelSectionRow><ButtonItem disabled={c.busy} onClick={close}>{t('返回','Back')}</ButtonItem></PanelSectionRow>
     </PanelSection>
-  </>;
+  </Focusable>;
 }
 
 let requestedScope: {scope:string;name:string}|undefined;
@@ -204,22 +238,25 @@ function QuickPanel() {
 function Settings({page}:{page:'configs'|'templates'|'hardware'|'about'}) {
   const c=useController();const s=c.state;
   const [editing,setEditing]=useState<{scope:string;name:string}|undefined>(()=>{const req=requestedScope;requestedScope=undefined;return page==='configs'?req:undefined;});
+  const returnTo=useRef<string|undefined>(undefined);
+  function openEditor(entry:{scope:string;name:string},origin=entry.scope){returnTo.current=origin;setEditing(entry);}
+  function closeEditor(){setEditing(undefined);}
   if(!s)return <Header c={c}/>;
-  if(editing)return <><Header c={c}/><Editor key={editing.scope} c={c} {...editing} onClose={()=>setEditing(undefined)}/></>;
+  if(editing)return <><Header c={c}/><Editor key={editing.scope} c={c} {...editing} onClose={closeEditor}/></>;
   return <><Header c={c}/>
     {page==='configs'&&<PanelSection title={t('按键配置','Button configurations')}>
-      <PanelSectionRow><ButtonItem onClick={()=>setEditing({scope:'default',name:t('默认按键','Default buttons')})}>{t('编辑默认按键','Edit default buttons')}</ButtonItem></PanelSectionRow>
-      {s.game&&s.game!=='default'&&!s.config.games[s.game]&&<PanelSectionRow><ButtonItem onClick={()=>setEditing({scope:s.game!,name:s.game_name})}>{t('为当前游戏创建：','Create for current game: ')+s.game_name}</ButtonItem></PanelSectionRow>}
+      <FocusEntry active={returnTo.current==='default'}><PanelSectionRow><ButtonItem onClick={()=>openEditor({scope:'default',name:t('默认按键','Default buttons')})}>{t('编辑默认按键','Edit default buttons')}</ButtonItem></PanelSectionRow></FocusEntry>
+      {s.game&&s.game!=='default'&&!s.config.games[s.game]&&<FocusEntry active={returnTo.current===s.game}><PanelSectionRow><ButtonItem onClick={()=>openEditor({scope:s.game!,name:s.game_name})}>{t('为当前游戏创建：','Create for current game: ')+s.game_name}</ButtonItem></PanelSectionRow></FocusEntry>}
       {Object.entries(s.config.games).map(([id,e])=><PanelSection key={id} title={e.name}>
         {row(e.enabled?t('已启用专用配置','Custom configuration enabled'):t('已停用，当前跟随默认','Disabled; uses defaults'))}
-        <PanelSectionRow><ButtonItem onClick={()=>setEditing({scope:id,name:e.name})}>{t('编辑','Edit')}</ButtonItem></PanelSectionRow>
+        <FocusEntry active={returnTo.current===id}><PanelSectionRow><ButtonItem onClick={()=>openEditor({scope:id,name:e.name})}>{t('编辑','Edit')}</ButtonItem></PanelSectionRow></FocusEntry>
         <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>confirm(t('删除专用配置？','Delete custom configuration?'),e.name,()=>void c.run(()=>enqueue(()=>deleteConfig(id,s.config.revision))))}>{t('删除并使用默认','Delete and use defaults')}</ButtonItem></PanelSectionRow>
       </PanelSection>)}
     </PanelSection>}
     {page==='templates'&&<PanelSection title={t('模板库 · 复制后互不关联','Templates · copies remain independent')}>
-      <PanelSectionRow><ButtonItem onClick={()=>setEditing({scope:'template:'+Date.now().toString(),name:t('新模板','New template')})}>{t('新建模板','New template')}</ButtonItem></PanelSectionRow>
+      <FocusEntry active={returnTo.current==='new-template'}><PanelSectionRow><ButtonItem onClick={()=>openEditor({scope:'template:'+Date.now().toString(),name:t('新模板','New template')},'new-template')}>{t('新建模板','New template')}</ButtonItem></PanelSectionRow></FocusEntry>
       {Object.entries(s.config.templates).map(([id,e])=><PanelSection key={id} title={e.name}>
-        <PanelSectionRow><ButtonItem onClick={()=>setEditing({scope:'template:'+id,name:e.name})}>{t('编辑','Edit')}</ButtonItem></PanelSectionRow>
+        <FocusEntry active={returnTo.current==='template:'+id}><PanelSectionRow><ButtonItem onClick={()=>openEditor({scope:'template:'+id,name:e.name})}>{t('编辑','Edit')}</ButtonItem></PanelSectionRow></FocusEntry>
         <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>confirm(t('删除模板？','Delete template?'),t('已复制到游戏的配置不受影响。','Existing game copies are unaffected.'),()=>void c.run(()=>enqueue(()=>deleteConfig('template:'+id,s.config.revision))))}>{t('删除','Delete')}</ButtonItem></PanelSectionRow>
       </PanelSection>)}
     </PanelSection>}
@@ -233,7 +270,7 @@ function Settings({page}:{page:'configs'|'templates'|'hardware'|'about'}) {
       {row(t('背键硬件模式可能影响独立 M1/M2 事件；不会自动更改。','Hardware back-button mode can affect independent M1/M2 events; it is never changed automatically.'))}
     </PanelSection><RumblePanel c={c}/></>}
     {page==='about'&&<PanelSection title={t('维护与诊断','Maintenance and diagnostics')}>
-      {row('0.1.0-alpha.3 · GPL-3.0-only')}
+      {row('0.1.0-alpha.4 · GPL-3.0-only')}
       {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
       {row(t('恢复：先到手柄设置停用管理。终端恢复和卸载方法见 README。','Recovery: disable management in device settings first. See README for terminal recovery and removal.'))}
       {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
