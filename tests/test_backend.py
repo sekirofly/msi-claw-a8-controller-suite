@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+import threading
+from unittest.mock import patch
 from backend.config import Store
 from main import Plugin
 
@@ -58,3 +60,65 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         await self.plugin.report_game(None, '')
         self.assertEqual(self.plugin.game, '12')
         self.assertEqual(self.plugin.game_name, 'Game')
+
+    async def test_cancelled_unload_does_not_strand_lock(self):
+        entered = threading.Event()
+        real_lock = self.plugin.lock
+        class ObservedLock:
+            def acquire(self, **kwargs):
+                entered.set()
+                return real_lock.acquire(**kwargs)
+            def release(self):
+                real_lock.release()
+        self.plugin.lock = ObservedLock()
+        real_lock.acquire()
+        task = asyncio.create_task(self.plugin._unload())
+        try:
+            self.assertTrue(await asyncio.to_thread(entered.wait, 1))
+            task.cancel()
+            await task
+        finally:
+            real_lock.release()
+        # Let the cancelled worker finish, then ensure future work can acquire.
+        await asyncio.sleep(.05)
+        acquired = real_lock.acquire(timeout=.2)
+        self.assertTrue(acquired)
+        if acquired:
+            real_lock.release()
+
+    async def test_long_rumble_cannot_overlap_and_maintenance_does_not_mark_running(self):
+        release = threading.Event()
+        finished = threading.Event()
+        def pulse(hardware):
+            try:
+                release.wait(2)
+            finally:
+                finished.set()
+        with patch('main.rumble.pulse', side_effect=pulse) as mocked:
+            try:
+                self.assertTrue((await self.plugin.test_rumble())['ok'])
+                self.plugin.last_test = 0  # cooldown expired, pulse still running
+                self.assertEqual((await self.plugin.test_rumble())['error'], 'test_busy')
+                self.assertEqual(mocked.call_count, 1)
+            finally:
+                release.set()
+                await asyncio.to_thread(finished.wait, 1)
+        self.plugin.maintaining = True
+        self.plugin.rumble_test = {'state': 'idle', 'code': '', 'detail': ''}
+        self.assertEqual((await self.plugin.test_rumble())['error'], 'maintenance_pending')
+        self.assertEqual(self.plugin.rumble_test['state'], 'idle')
+
+    async def test_startup_retries_setup_failure(self):
+        calls = []
+        async def operation(*args):
+            calls.append(True)
+            if len(calls) == 1:
+                return {'ok': False, 'error': 'operation_failed'}
+            return {'ok': True, 'data': None}
+        async def immediate_timeout(awaitable, timeout):
+            awaitable.close()
+            raise asyncio.TimeoutError
+        with patch.object(self.plugin, 'operation', side_effect=operation), \
+             patch('main.asyncio.wait_for', side_effect=immediate_timeout):
+            await self.plugin._main()
+        self.assertEqual(len(calls), 2)

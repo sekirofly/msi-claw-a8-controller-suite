@@ -1,5 +1,14 @@
 # Initial implementation status
 
+## Alpha.15: incremental review fixes
+
+- Preserve Alpha.14 file-only updates and avoid rebuilding an already-correct target set.
+- If restoration fails or is skipped, clean reinstall retains the active original snapshot and management preference while clearing mappings. Skipped uninstall also keeps an external emergency snapshot.
+- Retry complete target reads during object churn; never snapshot or confirm a partial list.
+- Cancelled shutdown cannot strand the backend lock; setup failure is retried during startup.
+- Reject overlapping rumble pulses and avoid false running state on maintenance rejection. Testing awaits an in-flight slider save and reports its failure without permanently blocking on historic errors.
+- Automated regression coverage; new failure paths still need A8 hardware validation. Existing layout and three-page navigation are unchanged.
+
 ## Alpha.14: an update no longer touches the controller
 
 - ``transact`` only restores before ``uninstall`` and ``reinstall``. A plain ``install`` (update or repair) now stops Decky, replaces files and starts Decky: the new version re-applies on start, and the snapshot is untouched.

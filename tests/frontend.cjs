@@ -17,7 +17,7 @@ const waitFor=async(check,timeout=1000)=>{const start=Date.now();
 
 for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble ordering: ${language}`,async()=>{
   Object.defineProperty(global,'navigator',{value:{language},configurable:true});
-  const calls=[];let factory;let release;
+  const calls=[];let factory;let release;let failSave=false;
   const hardware={mode:'macro',left:50,right:50};
   const state={config:{revision:0,default:{},games:{}},game:'1',game_name:'Game One',
     applied:'default',managed:true,paused:false,hardware,can_test:true,inputplumber:{sources:['M1','M2']}};
@@ -26,7 +26,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     ui[n]=props=>React.createElement(n,props,props.children);
   const api={definePlugin:f=>f,routerHook:{addRoute:(_,f)=>{factory=f},removeRoute(){}},callable:name=>async(...args)=>{
     calls.push([name,...args]);
-    if(name==='set_hardware') {await new Promise(r=>{release=r});hardware.left=args[1];hardware.right=args[2];return {ok:true,data:hardware};}
+    if(name==='set_hardware') {await new Promise(r=>{release=r});if(failSave)return {ok:false,error:'readback_failed'};hardware.left=args[1];hardware.right=args[2];return {ok:true,data:hardware};}
     if(name==='get_state')return {ok:true,data:JSON.parse(JSON.stringify(state))};
     if(name==='set_management') {state.managed=args[0];state.apply_error=null;return {ok:true,data:state};}
     return {ok:true,data:true};
@@ -51,6 +51,19 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     // A zero-argument callable must reach the backend with no arguments:
     // an extra positional value makes Python raise before the body runs.
     assert.deepEqual(calls.filter(x=>x[0]==='test_rumble'),[['test_rumble']]);
+    // The debounce has already consumed pending values, but the device write
+    // is still running. Testing must await its result, including failure.
+    await act(async()=>{rendered.root.findAllByType('SliderField')[0].props.onChange(80)});
+    await waitFor(()=>calls.filter(x=>x[0]==='set_hardware').length===2);
+    failSave=true;
+    await act(async()=>{testButton.props.onClick();await Promise.resolve()});
+    await act(async()=>{release();await new Promise(r=>setTimeout(r,10))});
+    assert.equal(calls.filter(x=>x[0]==='test_rumble').length,1);
+    assert.match(JSON.stringify(rendered.toJSON()),language==='zh-CN'?/震动值未保存/:/Rumble value not saved/);
+    // A completed, historic failure must not permanently block later tests.
+    failSave=false;
+    await act(async()=>{testButton.props.onClick();await new Promise(r=>setTimeout(r,10))});
+    assert.equal(calls.filter(x=>x[0]==='test_rumble').length,2);
     assert.ok(factory);
     // An enabled-but-not-applied preference has a retry action, not a restore prerequisite.
     state.apply_error='external_change';state.applied=null;
