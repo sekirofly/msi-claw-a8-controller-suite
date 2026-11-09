@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 import sys
+import threading
 import time
 
 # Decky loads main.py directly, not as a Python package.
@@ -17,9 +18,18 @@ from backend import rumble
 log = logging.getLogger('msi-claw-a8-controller-suite')
 
 
+def describe(exc):
+    """Short, panel-readable description of an exception for diagnostics."""
+    text = str(exc).strip()
+    return (type(exc).__name__ + ': ' + text)[:300] if text else type(exc).__name__
+
+
 class Plugin:
     def __init__(self):
-        self.lock = asyncio.Lock()
+        # A thread lock, not asyncio.Lock: the guard must never depend on which
+        # event loop Decky dispatches a callable on, and a cancelled coroutine
+        # must not release it while its worker thread still touches a device.
+        self.lock = threading.Lock()
         self.store = None
         self.hardware = Hardware()
         self.ip = None
@@ -28,6 +38,7 @@ class Plugin:
         self.applied = None
         self.apply_error = None
         self.last_test = 0.0
+        self.last_error = ''
         self.maintaining = False
         self.stopping = asyncio.Event()
 
@@ -39,14 +50,19 @@ class Plugin:
             self.store, self.ip = store, ip
 
     async def operation(self, fn):
-        async with self.lock:
-            task = asyncio.create_task(asyncio.to_thread(self.work, fn))
-            try:
-                return await asyncio.shield(task)
-            except asyncio.CancelledError:
-                # Never release the lock while its worker is still touching a device.
-                await task
-                raise
+        def run():
+            with self.lock:
+                return self.work(fn)
+        try:
+            return await asyncio.to_thread(run)
+        except asyncio.CancelledError:
+            raise
+        except BaseException as exc:
+            # An exception here would reach Decky, which reports only a bare
+            # "Python Exception" and hides the cause from the panel.
+            self.last_error = describe(exc)
+            log.exception('Controller callable failed outside the worker')
+            return {'ok': False, 'error': 'internal ' + describe(exc)}
 
     def work(self, fn):
         try:
@@ -56,13 +72,14 @@ class Plugin:
             return {'ok': True, 'data': fn()}
         except Exception as exc:
             code = str(exc) if isinstance(exc, SuiteError) else 'operation_failed'
+            self.last_error = describe(exc)
             log.exception('Controller operation failed (%s)', code)
             return {'ok': False, 'error': code}
 
     def status(self):
         state = {'config': self.store.snapshot(), 'game': self.game, 'game_name': self.game_name,
                  'applied': self.applied, 'apply_error': self.apply_error,
-                 'managed': self.ip.enabled}
+                 'managed': self.ip.enabled, 'last_error': self.last_error}
         for key, call in [('hardware', self.hardware.state), ('inputplumber', self.ip.status)]:
             try:
                 state[key] = call()
@@ -190,5 +207,6 @@ class Plugin:
     async def _unload(self):
         # Updates/reloads must not reset hardware or destroy the recovery snapshot.
         self.stopping.set()
-        async with self.lock:
-            pass
+        # Wait for an in-flight device write instead of interleaving with it.
+        await asyncio.to_thread(self.lock.acquire)
+        self.lock.release()

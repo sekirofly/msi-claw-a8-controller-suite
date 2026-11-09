@@ -9,7 +9,7 @@ type Rules = Record<string, string[]>;
 type Entry = {name: string; rules: Rules; enabled?: boolean};
 type Config = {revision: number; default: Rules; games: Record<string, Entry>};
 type State = {config: Config; game: string | null; game_name: string; applied: string | null; apply_error?: string;
-  managed: boolean; hardware?: {mode: string; left: number; right: number};
+  managed: boolean; last_error?: string; hardware?: {mode: string; left: number; right: number};
   hardware_error?: string; inputplumber_error?: string; inputplumber?: {sources: string[]; profile: string; targets: string[]}; can_test: boolean};
 type Result<T> = {ok: boolean; data: T; error?: string};
 const getState = callable<[], Result<State>>('get_state');
@@ -283,7 +283,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复原配置并停用','Restore original configuration and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.6 · GPL-3.0-only')}
+        {row('0.1.0-alpha.7 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {row(t('恢复：先在上方插件管理停用管理。终端恢复和卸载方法见 README。','Recovery: disable management in the section above first. See README for terminal recovery and removal.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
@@ -295,7 +295,8 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
       </PanelSection>
       <PanelSection title={t('诊断信息','Diagnostics')}>
         <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>void c.run(async()=>{})}>{t('刷新诊断','Refresh diagnostics')}</ButtonItem></PanelSectionRow>
-        {row(JSON.stringify({hardware:s.hardware, hardware_error:s.hardware_error, inputplumber:s.inputplumber,inputplumber_error:s.inputplumber_error,can_test:s.can_test},null,2))}
+        {s.last_error&&row(t('最近的后端错误：','Last backend error: ')+s.last_error)}
+        {row(JSON.stringify({hardware:s.hardware, hardware_error:s.hardware_error, inputplumber:s.inputplumber,inputplumber_error:s.inputplumber_error,can_test:s.can_test,last_error:s.last_error},null,2))}
       </PanelSection>
     </>}
   </>;
