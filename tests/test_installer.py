@@ -151,34 +151,42 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(len(list((self.home / ('.'+installer.FOLDER+'-recovery')).glob('*.json'))), 1)
 
     def test_install_update_preserves_configuration(self):
-        snapshot = self.active_snapshot()
-        def restore(*args, **kwargs): snapshot.write_text('{"active":false}')
-        staged = self.home / 'stage'
-        staged.mkdir()
-        (staged / 'plugin.json').write_text(json.dumps({'name': installer.NAME}))
-        with patch.object(installer, 'service'), patch.object(installer.subprocess, 'run', side_effect=restore), patch.object(installer.os, 'chown', create=True):
-            installer.transact(self.home, 'install', staged)
-        self.assertEqual((snapshot.parent / 'config.json').read_text(), '{"keep":"config"}')
-        self.assertFalse(json.loads(snapshot.read_text())['active'])
-        self.assertTrue(json.loads((snapshot.parent / 'management.json').read_text())['enabled'])
-
-    def test_failed_update_restoration_warns_and_preserves_disabled_preference(self):
-        # An update warns instead of aborting when the restore cannot be
-        # confirmed, but the explicit disabled choice and the snapshot survive.
+        # An update keeps the configuration, the snapshot and the management
+        # choice untouched: the new version re-applies from that snapshot
+        # instead of restoring first, so nothing in settings is rewritten.
         snapshot = self.active_snapshot()
         preference = snapshot.parent / 'management.json'
         preference.write_text('{"enabled":false}')
-        def fail(*args, **kwargs):
-            preference.write_text('{"enabled":false}')
-            raise RuntimeError('device offline')
         staged = self.home / 'stage'
         staged.mkdir()
         (staged / 'plugin.json').write_text(json.dumps({'name': installer.NAME}))
-        with patch.object(installer, 'service'), patch.object(installer.subprocess, 'run', side_effect=fail), \
+        with patch.object(installer, 'service'), patch.object(installer.os, 'chown', create=True):
+            installer.transact(self.home, 'install', staged)
+        self.assertEqual((snapshot.parent / 'config.json').read_text(), '{"keep":"config"}')
+        self.assertTrue(json.loads(snapshot.read_text())['active'])
+        self.assertFalse(json.loads(preference.read_text())['enabled'])
+
+    def test_update_does_not_touch_the_controller(self):
+        # A plain update replaces files only. Restoring first rebuilt every
+        # InputPlumber target object, which made updates slow and could fail for
+        # no benefit: the new version re-applies on start.
+        snapshot = self.active_snapshot()
+        preference = snapshot.parent / 'management.json'
+        preference.write_text('{"enabled":false}')
+        staged = self.home / 'stage'
+        staged.mkdir()
+        (staged / 'plugin.json').write_text(json.dumps({'name': installer.NAME}))
+        calls = []
+        def record(*args, **kwargs):
+            calls.append(args)
+            return None
+        with patch.object(installer, 'service'), patch.object(installer.subprocess, 'run', side_effect=record), \
              patch.object(installer.os, 'chown', create=True):
             installer.transact(self.home, 'install', staged)
+        self.assertEqual(calls, [], 'an update must not run recover.py or any subprocess')
         self.assertFalse(json.loads(preference.read_text())['enabled'])
         self.assertTrue(json.loads(snapshot.read_text())['active'])
+        self.assertTrue((self.target / 'plugin.json').exists())
 
     def test_corrupt_snapshot_blocks_removal(self):
         snapshot = self.active_snapshot()
