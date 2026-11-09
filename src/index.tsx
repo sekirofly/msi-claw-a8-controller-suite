@@ -9,7 +9,8 @@ type Rules = Record<string, string[]>;
 type Entry = {name: string; rules: Rules; enabled?: boolean};
 type Config = {revision: number; default: Rules; games: Record<string, Entry>};
 type State = {config: Config; game: string | null; game_name: string; applied: string | null; apply_error?: string;
-  managed: boolean; last_error?: string; call_log?: string[];
+  managed: boolean; last_error?: string; call_log?: string[]; consistent?: boolean;
+  pid?: number; started?: string;
   rumble_test?: {state: string; code?: string; detail?: string};
   hardware?: {mode: string; left: number; right: number};
   hardware_error?: string; inputplumber_error?: string; inputplumber?: {sources: string[]; profile: string; targets: string[]}; can_test: boolean};
@@ -60,7 +61,10 @@ let outstanding = 0;
 const stateListeners = new Set<() => void>();
 const enqueue = <T,>(action: () => Promise<Result<T>>): Promise<T> => {
   outstanding++;
-  const next = chain.then(action).then(r => {if (!r.ok) throw new Error(errorText(r.error)); return r.data;}).finally(()=>{outstanding--;});
+  // then() hands the previous value to its callback. Never forward it: a
+  // zero-argument callable would otherwise reach Python with one extra
+  // positional argument and fail before its body runs.
+  const next = chain.then(() => action()).then(r => {if (!r.ok) throw new Error(errorText(r.error)); return r.data;}).finally(()=>{outstanding--;});
   chain = next.catch(e => {writeError = String(e);});
   return next;
 };
@@ -149,7 +153,7 @@ function RumblePanel({c}: {c: Controller}) {
           setTesting(false); return;
         }
         try {
-          await enqueue(testRumble);
+          await enqueue(() => testRumble());
         } catch(e) {
           setError(t('测试调用失败：','Test call failed: ')+String(e));
         } finally {setTesting(false);}
@@ -304,6 +308,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
           : t('管理已停用：手柄使用接管前的原始配置，插件不再自动应用按键。','Management disabled: the controller keeps its original configuration and no buttons are applied automatically.'))}
         {row(t('不影响外接手柄；不重置背键硬件模式和震动。','External controllers are unaffected; hardware back-button mode and rumble are not reset.'))}
         {s.inputplumber_error&&row(errorText(s.inputplumber_error))}
+        {s.managed&&s.consistent===false&&row(t('检测到手柄的实际输出与套件期望不一致（可能被外部重置）。点“重试”重新应用，不会自动改写。','The controller output differs from what this suite expects, possibly after an external reset. Use Retry to re-apply; nothing is rewritten automatically.'))}
         <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>{
           if(!s.managed){void c.run(()=>enqueue(()=>manage(true)));return;}
           confirm(t('恢复原配置并停用管理？','Restore the original configuration and disable management?'),
@@ -312,7 +317,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复原配置并停用','Restore original configuration and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.11 · GPL-3.0-only')}
+        {row('0.1.0-alpha.12 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {row(t('恢复：先在上方插件管理停用管理。终端恢复和卸载方法见 README。','Recovery: disable management in the section above first. See README for terminal recovery and removal.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
@@ -325,21 +330,27 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
       <PanelSection title={t('诊断信息','Diagnostics')}>
         <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>void c.run(async()=>{})}>{t('刷新诊断','Refresh diagnostics')}</ButtonItem></PanelSectionRow>
         {s.last_error&&row(t('最近的后端错误：','Last backend error: ')+s.last_error)}
-        {row(JSON.stringify({hardware:s.hardware, hardware_error:s.hardware_error, inputplumber:s.inputplumber,inputplumber_error:s.inputplumber_error,can_test:s.can_test,last_error:s.last_error,call_log:s.call_log},null,2))}
+        {row(JSON.stringify({pid:s.pid, started:s.started, managed:s.managed, consistent:s.consistent, hardware:s.hardware, hardware_error:s.hardware_error, inputplumber:s.inputplumber, inputplumber_error:s.inputplumber_error, can_test:s.can_test, rumble_test:s.rumble_test, last_error:s.last_error, call_log:s.call_log},null,2))}
       </PanelSection>
     </>}
   </>;
 }
 
 export default definePlugin(()=>{
-  let last:string|undefined;let stable=0;let ticking=false;let count=0;
+  let last:string|undefined;let reported:string|undefined;let stable=0;let ticking=false;
   const tick=async()=>{
     if(ticking)return;ticking=true;
     try {
       const app=Router.MainRunningApp;
       const id=app?.appid?String(app.appid):'default';
+      // Only a change is worth a backend call. The old periodic re-report fed a
+      // 5 s backend poll; both are gone now.
+      if(id===reported)return;
       stable=id===last?stable+1:0;last=id;
-      if(stable>=2 && (++count%5===1)) {await reportGame(id,app?.display_name??'');stateListeners.forEach(fn=>fn());}
+      if(stable<2)return;
+      reported=id;
+      await reportGame(id,app?.display_name??'');
+      stateListeners.forEach(fn=>fn());
     } catch {await reportGame(null,'').catch(()=>{});} finally {ticking=false;}
   };
   const interval=setInterval(()=>void tick(),1000);

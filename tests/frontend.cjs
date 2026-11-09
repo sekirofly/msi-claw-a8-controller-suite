@@ -48,7 +48,9 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     assert.equal(calls.filter(x=>x[0]==='test_rumble').length,0);
     assert.equal(calls.filter(x=>x[0]==='set_hardware').length,1);
     await act(async()=>{release();await new Promise(r=>setTimeout(r,10))});
-    assert.equal(calls.filter(x=>x[0]==='test_rumble').length,1);
+    // A zero-argument callable must reach the backend with no arguments:
+    // an extra positional value makes Python raise before the body runs.
+    assert.deepEqual(calls.filter(x=>x[0]==='test_rumble'),[['test_rumble']]);
     assert.ok(factory);
     // An enabled-but-not-applied preference has a retry action, not a restore prerequisite.
     state.apply_error='external_change';state.applied=null;
