@@ -62,9 +62,9 @@ The UI represents the actual A8 buttons, including M1/M2. Steam may still identi
 
 ## Research and implementation plan
 
-The proposed integration design is ready for review: [简体中文设计草案](docs/design.zh-CN.md). The quick panel shows active mappings and shared rumble controls; infrequent hardware back-button modes move into device settings. Game-specific mappings start as independent copies of default mappings, with explicit editing scope and save actions. Library presets are copied into configurations rather than silently linked. Implementation has started; see [implementation status](docs/implementation-status.md).
+The proposed integration design is ready for review: [简体中文设计草案](docs/design.zh-CN.md). The quick panel shows active mappings and shared rumble controls; infrequent hardware back-button modes move into device settings. Game-specific mappings start as independent copies of default mappings, with explicit editing scope and save actions. Copies are made from the default buttons or another game's saved configuration; the separate template library page was removed because it duplicated that path. Implementation has started; see [implementation status](docs/implementation-status.md).
 
-Confirmed: each game has at most one independent configuration, copied from defaults, another game's saved configuration, or a template. No live cross-game sharing. See the [pre-implementation integration review](docs/integration-review.zh-CN.md) for source-level conflicts, proposed scope boundaries and hardware checks still required.
+Confirmed: each game has at most one independent configuration, copied from the default buttons or another game's saved configuration. No live cross-game sharing and no template library. See the [pre-implementation integration review](docs/integration-review.zh-CN.md) for source-level conflicts, proposed scope boundaries and hardware checks still required.
 
 See [code research and capability matrix](docs/research.md), [中文调研与路线](docs/research.zh-CN.md), and [source provenance](THIRD_PARTY.md).
 

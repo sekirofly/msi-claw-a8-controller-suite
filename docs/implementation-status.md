@@ -1,5 +1,12 @@
 # Initial implementation status
 
+## Unreleased: navigation simplified
+
+- The template library page is removed. Copy sources are the default buttons or another game's saved configuration; existing `templates` entries stay in the configuration file and are no longer shown or used.
+- Device settings now holds only the back-button hardware mode and rumble. Plugin management (enable, restore original configuration and disable) moved to Maintenance and about, behind a confirmation dialog.
+- Back-button modes show translated names next to the upstream identifiers. Per-mode behaviour descriptions still need device verification and were not invented.
+- The localized UI test asserts three sidebar pages, that the device page no longer offers management, and polls for focus transfer instead of assuming a fixed delay, removing a pre-existing flake.
+
 ## Alpha.4: editor focus and compact mappings
 
 Editor entry explicitly focuses the copy-source control; returning restores the originating entry. Six physical-button groups use two controls per row with horizontal gamepad navigation containers. DOM focus and paired geometry are browser-tested; Steam gamepad navigation still requires device validation.
