@@ -39,6 +39,7 @@ class Plugin:
         self.apply_error = None
         self.last_test = 0.0
         self.last_error = ''
+        self.rumble_test = {'state': 'idle', 'code': '', 'detail': ''}
         self.maintaining = False
         self.stopping = asyncio.Event()
 
@@ -79,7 +80,8 @@ class Plugin:
     def status(self):
         state = {'config': self.store.snapshot(), 'game': self.game, 'game_name': self.game_name,
                  'applied': self.applied, 'apply_error': self.apply_error,
-                 'managed': self.ip.enabled, 'last_error': self.last_error}
+                 'managed': self.ip.enabled, 'last_error': self.last_error,
+                 'rumble_test': dict(self.rumble_test)}
         for key, call in [('hardware', self.hardware.state), ('inputplumber', self.ip.status)]:
             try:
                 state[key] = call()
@@ -141,16 +143,28 @@ class Plugin:
         return await self.operation(lambda: self.hardware.set(mode, left, right))
 
     async def test_rumble(self):
+        # The pulse lasts ~0.5 s and must not hold the callable or the device
+        # queue, so it runs on its own thread and reports through status().
         requested = time.monotonic()
         if requested - self.last_test < 1:
             return {'ok': False, 'error': 'test_busy'}
         self.last_test = requested
-        def test():
-            if time.monotonic() - requested > 2:
-                raise SuiteError('test_expired')
-            rumble.pulse(self.hardware)
+        self.rumble_test = {'state': 'running', 'code': '', 'detail': ''}
+
+        def pulse():
+            try:
+                rumble.pulse(self.hardware)
+                self.rumble_test = {'state': 'ok', 'code': '', 'detail': ''}
+            except Exception as exc:
+                code = str(exc) if isinstance(exc, SuiteError) else 'operation_failed'
+                self.rumble_test = {'state': 'error', 'code': code, 'detail': describe(exc)}
+                self.last_error = describe(exc)
+                log.exception('Rumble test failed (%s)', code)
+
+        def start():
+            threading.Thread(target=pulse, name='a8-rumble-test', daemon=True).start()
             return True
-        return await self.operation(test)
+        return await self.operation(start)
 
     async def set_management(self, enabled):
         def change():
