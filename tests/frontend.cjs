@@ -19,7 +19,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
   Object.defineProperty(global,'navigator',{value:{language},configurable:true});
   const calls=[];let factory;let release;
   const hardware={mode:'macro',left:50,right:50};
-  const state={config:{revision:0,default:{},games:{},templates:{}},game:'1',game_name:'Game One',
+  const state={config:{revision:0,default:{},games:{}},game:'1',game_name:'Game One',
     applied:'default',managed:true,paused:false,hardware,can_test:true,inputplumber:{sources:['M1','M2']}};
   const ui={Router:{MainRunningApp:{appid:1,display_name:'Game One'}},Navigation:{Navigate(){},CloseSideMenus(){}},showModal(el){el?.props?.onOK?.()}};
   for(const n of ['ButtonItem','PanelSection','PanelSectionRow','SliderField','ToggleField','DropdownItem','TextField','ConfirmModal','SidebarNavigation','Focusable'])

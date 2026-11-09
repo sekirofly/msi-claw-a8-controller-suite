@@ -1,4 +1,5 @@
 import copy
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -66,11 +67,17 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(SuiteError, 'config_corrupt'): Store(self.path)
         self.assertEqual(self.path.read_text(), 'broken')
 
-    def test_template_has_no_live_reference(self):
-        self.save('template:test', {'M1':['A']})
-        self.save('1', self.store.data['templates']['test']['rules'])
-        self.store.delete('template:test', self.store.data['revision'])
-        self.assertEqual(self.store.selected('1')[1], {'M1':['A']})
+    def test_legacy_template_key_is_dropped(self):
+        legacy = {'schema': 1, 'revision': 2, 'default': {},
+                  'games': {'1': {'name': 'Game', 'enabled': True, 'rules': {'M1': ['A']}}},
+                  'templates': {'old': {'name': 'Old', 'rules': {'M1': ['B']}}}}
+        self.path.write_text(json.dumps(legacy))
+        store = Store(self.path)
+        self.assertNotIn('templates', store.snapshot())
+        self.assertEqual(store.selected('1')[1], {'M1': ['A']})
+        # The key disappears from disk on the next commit instead of being rewritten.
+        store.delete('1', store.data['revision'])
+        self.assertNotIn('templates', json.loads(self.path.read_text()))
 
     def test_compiler_preserves_base_and_strips_targets(self):
         base = {'version':1,'kind':'DeviceProfile','name':'System','target_devices':['ds5'],
