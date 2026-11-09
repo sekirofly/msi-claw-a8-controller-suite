@@ -53,19 +53,18 @@ def atomic_json(path, data):
 class Store:
     def __init__(self, path):
         self.path = Path(path)
-        self.data = {'schema': 1, 'revision': 0, 'default': {}, 'games': {}, 'templates': {}}
+        self.data = {'schema': 1, 'revision': 0, 'default': {}, 'games': {}}
         if self.path.exists():
             try:
                 loaded = json.loads(self.path.read_text(encoding='utf-8'))
                 assert loaded['schema'] == 1 and type(loaded['revision']) is int
+                # The template library was removed; drop its key from older files
+                # in memory so the next commit writes a file without it.
+                loaded.pop('templates', None)
                 validate_rules(loaded['default'])
                 for key, entry in loaded['games'].items():
                     valid_id(key)
                     assert isinstance(entry['name'], str) and type(entry['enabled']) is bool
-                    validate_rules(entry['rules'])
-                for key, entry in loaded['templates'].items():
-                    assert re.fullmatch(r'[a-zA-Z0-9_-]{1,64}', key)
-                    assert isinstance(entry['name'], str)
                     validate_rules(entry['rules'])
                 self.data = loaded
             except Exception as exc:
@@ -83,11 +82,6 @@ class Store:
         next_data = self.snapshot()
         if scope == 'default':
             next_data['default'] = rules
-        elif scope.startswith('template:'):
-            key = scope[9:]
-            if not re.fullmatch(r'[a-zA-Z0-9_-]{1,64}', key):
-                raise SuiteError('invalid_rules')
-            next_data['templates'][key] = {'name': name, 'rules': rules}
         else:
             valid_id(scope)
             next_data['games'][scope] = {'name': name, 'enabled': enabled, 'rules': rules}
@@ -97,11 +91,8 @@ class Store:
         if revision != self.data['revision']:
             raise SuiteError('stale_edit')
         next_data = self.snapshot()
-        if scope.startswith('template:'):
-            next_data['templates'].pop(scope[9:], None)
-        else:
-            valid_id(scope)
-            next_data['games'].pop(scope, None)
+        valid_id(scope)
+        next_data['games'].pop(scope, None)
         self.commit(next_data)
 
     def commit(self, data):
