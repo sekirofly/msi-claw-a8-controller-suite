@@ -15,6 +15,12 @@ const waitFor=async(check,timeout=1000)=>{const start=Date.now();
   while(!check()){if(Date.now()-start>timeout)return;
     await act(async()=>{await new Promise(r=>setTimeout(r,10))});}};
 
+function loadMonitor(){
+  const filename=path.resolve('src/game-monitor.ts');
+  const code=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+  const mod=new Module(filename,module);mod.filename=filename;mod._compile(code,filename);return mod.exports;
+}
+
 for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble ordering: ${language}`,async()=>{
   Object.defineProperty(global,'navigator',{value:{language},configurable:true});
   const calls=[];let factory;let release;let failSave=false;let failMaintenance=true;
@@ -35,7 +41,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
   const filename=path.resolve('src/index.tsx');
   const compiled=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2020}}).outputText;
   const mod=new Module(filename,module);mod.filename=filename;mod.paths=Module._nodeModulePaths(path.dirname(filename));
-  const original=mod.require.bind(mod);mod.require=n=>n==='@decky/ui'?ui:n==='@decky/api'?api:original(n);mod._compile(compiled,filename);
+  const original=mod.require.bind(mod);mod.require=n=>n==='./game-monitor'?loadMonitor():n==='@decky/ui'?ui:n==='@decky/api'?api:original(n);mod._compile(compiled,filename);
   const plugin=mod.exports.default();let rendered;
   try {
     await act(async()=>{rendered=create(plugin.content)});
@@ -224,10 +230,12 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
   const filename=path.resolve('src/index.tsx');
   const compiled=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2020}}).outputText;
   const mod=new Module(filename,module);mod.filename=filename;mod.paths=Module._nodeModulePaths(path.dirname(filename));
-  const original=mod.require.bind(mod);mod.require=n=>n==='@decky/ui'?ui:n==='@decky/api'?api:original(n);mod._compile(compiled,filename);
-  const plugin=mod.exports.default();let quick,nav,page;
+  const original=mod.require.bind(mod);mod.require=n=>n==='./game-monitor'?loadMonitor():n==='@decky/ui'?ui:n==='@decky/api'?api:original(n);mod._compile(compiled,filename);
+  const plugin=mod.exports.default();let quick,nav,page,twin;
   try{
-    await act(async()=>{quick=create(plugin.content);nav=create(factory())});
+    await act(async()=>{quick=create(plugin.content);twin=create(plugin.content);nav=create(factory())});
+    assert.equal(calls.filter(c=>c[0]==='get_state').length,1,'simultaneous views share one state read');
+    await act(async()=>twin.unmount());
     const card=quick.root.findAllByType('ButtonItem').find(x=>typeof x.props.children==='string'&&/编辑.*按键|创建专用按键|Edit .*buttons|Create custom buttons/.test(x.props.children));
     assert.ok(JSON.stringify(quick.toJSON()).includes((zh?'当前按键：':'Current buttons: ')+'Same · ID 1'),'scope is plain information');
     assert.equal(card.findAllByType('Focusable').length,0);
@@ -314,4 +322,38 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
   }finally{
     await act(async()=>{modalHandle?.Close();page?.unmount();nav?.unmount();quick?.unmount()});plugin.onDismount();
   }
+});
+
+
+test('game monitor has no idle timers when observed, stabilizes changes and bounds retries',async()=>{
+  const originalSet=global.setTimeout,originalClear=global.clearTimeout,originalNow=Date.now;
+  let now=0,next=0;const timers=new Map();
+  global.setTimeout=(fn,delay)=>{const id=++next;timers.set(id,{fn,at:now+delay});return id;};
+  global.clearTimeout=id=>timers.delete(id);Date.now=()=>now;
+  const advance=async(ms)=>{const end=now+ms;
+    for(;;){const entry=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];
+      if(!entry)break;timers.delete(entry[0]);now=entry[1].at;entry[1].fn();for(let i=0;i<8;i++)await Promise.resolve();}
+    now=end;
+  };
+  let dispose;
+  try{
+    const {monitorGame}=loadMonitor();let app={appid:1,display_name:'One'},notify,unregistered=0;
+    const reports=[];
+    dispose=monitorGame(()=>app,async(id,name)=>{reports.push([id,name]);return {ok:true};},()=>{},fn=>{notify=fn;return {observed:true,dispose:()=>unregistered++};});
+    await advance(750);assert.deepEqual(reports,[['1','One']]);assert.equal(timers.size,0);
+    await advance(60000);assert.equal(reports.length,1);
+    app={appid:2,display_name:'Two'};notify();await advance(500);notify();await advance(250);
+    assert.deepEqual(reports.at(-1),['2','Two']);assert.equal(timers.size,0);
+    app=undefined;notify();await advance(750);assert.deepEqual(reports.at(-1),['default','']);
+    dispose();assert.equal(unregistered,1);assert.equal(timers.size,0);
+    let attempts=0;
+    dispose=monitorGame(()=>({appid:4}),async()=>{attempts++;return {ok:false};},()=>{},()=>({observed:false,dispose(){}}));
+    await advance(750);assert.equal(attempts,1);
+    await advance(2000);assert.equal(attempts,2);
+    await advance(4999);assert.equal(attempts,2,'compatibility checks cannot bypass backoff');
+    await advance(1);assert.equal(attempts,3);
+    await advance(45000);assert.equal(attempts,5);
+    await advance(120000);assert.equal(attempts,5,'persistent errors stop backend retrying');
+    dispose();assert.equal(timers.size,0);
+  }finally{dispose?.();global.setTimeout=originalSet;global.clearTimeout=originalClear;Date.now=originalNow;}
 });

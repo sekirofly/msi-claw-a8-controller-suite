@@ -58,8 +58,8 @@ class Hardware:
             return self.usb(self.sys / 'class/hidraw' / name / 'device') == Path(identity['usb'])
         return False
 
-    def state(self):
-        identity = self.discover()
+    def state(self, identity=None):
+        identity = identity or self.discover()
         p = identity['path']
         mode, left, right = read(p / ATTRS[0]), int(read(p / ATTRS[1])), int(read(p / ATTRS[2]))
         if mode not in MODES or not (0 <= left <= 100 and 0 <= right <= 100):

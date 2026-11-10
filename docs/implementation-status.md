@@ -1,5 +1,13 @@
 # Initial implementation status
 
+## Alpha.33: reduce idle timers and disk logging
+
+- Observe verified MobX Router dependencies plus Steam lifecycle notifications. Use a 5-second compatibility check only without an effective observer. Stabilize changes for 750ms; failed reports back off 2/5/15/30 seconds and stop after five attempts until a new event.
+- Replace slider-save polling with completion notifications; one delayed rumble refresh and lifecycle cleanup.
+- Coalesce concurrent state requests with mutation invalidation. Reuse a fresh identity within one status read; retain fresh identity checks for mutations. Identical game reports do not reapply mappings.
+- Successful state-read traces stay in memory. Rotate calls.log and calls.log.1, each bounded near 64KiB (about 128KiB combined), deduplicate repeated errors. Host logs have their own limits.
+- Fake-clock and component tests cover idle timers, transitions, backoff, cleanup and read coalescing. Actual Steam compatibility and power savings require hardware measurement; no wattage claim.
+
 ## Alpha.32: combined plugin/controller repair
 
 Repair retains mappings; clean reinstall clears them. Both maintenance actions reset the verified internal controller after installing files and require a handheld reboot. No hardware settings backup/reapply. Ordinary updates remain file-only. Show an inline wait message and disable maintenance buttons after confirmation; submission failure allows retry. Uninstall restores system defaults. Background failure restarts Decky to release pending state, with the error retained in its journal.

@@ -17,6 +17,41 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         self.plugin.ip=SimpleNamespace(enabled=True, reconcile=lambda rules:self.applied.append(rules))
         self.plugin.status=lambda:{'config':self.plugin.store.snapshot(),'apply_error':self.plugin.apply_error}
 
+    async def test_status_reuses_one_fresh_hardware_discovery(self):
+        identity = {'usb': 'internal', 'events': []}
+        self.plugin.ip = SimpleNamespace(enabled=True, ready=True, restore_pending=False,
+                                         expected_targets=['xbox-elite'], status=lambda found: {'targets':['xbox-elite']})
+        with patch.object(self.plugin.hardware, 'discover', return_value=identity) as discover, \
+             patch.object(self.plugin.hardware, 'state', return_value={'mode':'macro'}) as state:
+            result = Plugin.status(self.plugin)
+        discover.assert_called_once()
+        state.assert_called_once_with(identity)
+        self.assertTrue(result['consistent'])
+
+    async def test_identical_game_reports_do_not_reapply(self):
+        await self.plugin.report_game('1', 'One')
+        await self.plugin.report_game('1', 'Renamed')
+        self.assertEqual(self.applied, [{}])
+        self.assertEqual(self.plugin.game_name, 'Renamed')
+
+    async def test_read_traces_do_not_write_and_log_rotation_is_bounded(self):
+        import os
+        directory = Path(self.tmp.name)
+        with patch.dict(os.environ, {'DECKY_PLUGIN_SETTINGS_DIR': str(directory)}):
+            for _ in range(100):
+                self.plugin.trace('get_state', 'start')
+                self.plugin.trace('get_state', 'ok')
+            self.assertFalse((directory / 'calls.log').exists())
+            self.plugin.trace('save_config', 'error unavailable')
+            size = (directory / 'calls.log').stat().st_size
+            self.plugin.trace('save_config', 'error unavailable')
+            self.assertEqual((directory / 'calls.log').stat().st_size, size)
+            (directory / 'calls.log').write_bytes(b'x' * 70000)
+            self.plugin.trace('save_config', 'ok')
+            self.assertLessEqual((directory / 'calls.log.1').stat().st_size, 65536)
+            self.assertLessEqual((directory / 'calls.log').stat().st_size, 65536)
+            self.assertLessEqual(len(self.plugin.call_log), 40)
+
     async def test_saving_inactive_game_does_not_apply_its_rules(self):
         self.plugin.game='1'
         result=await self.plugin.save_config('2','Other',{'M1':['A']},True,0)

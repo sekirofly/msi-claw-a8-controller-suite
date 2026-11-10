@@ -1,7 +1,9 @@
 import {useEffect, useRef, useState} from 'react';
 import {ButtonItem, PanelSection, PanelSectionRow, SliderField, ToggleField, DropdownItem,
-  ConfirmModal, DialogButton, ModalRoot, showModal, Navigation, Router, SidebarNavigation, Focusable} from '@decky/ui';
+  ConfirmModal, DialogButton, ModalRoot, showModal, Navigation, Router, SidebarNavigation, Focusable, findModule} from '@decky/ui';
 import {callable, definePlugin, routerHook} from '@decky/api';
+
+import {monitorGame} from './game-monitor';
 
 const route = '/msi-claw-a8-controller-suite';
 const t = (zh: string, en: string) => /^zh(?:[-_]|$)/i.test(navigator.language) ? zh : en;
@@ -15,7 +17,18 @@ type State = {config: Config; game: string | null; game_name: string; game_known
   hardware?: {mode: string; left: number; right: number};
   hardware_error?: string; inputplumber_error?: string; inputplumber?: {sources: string[]; profile: string; targets: string[]}; can_test: boolean};
 type Result<T> = {ok: boolean; data: T; error?: string};
-const getState = callable<[], Result<State>>('get_state');
+const fetchState = callable<[], Result<State>>('get_state');
+let stateRead: Promise<Result<State>>|undefined;
+let stateRevision=0;
+function invalidateState(){stateRevision++;stateRead=undefined;}
+function getState(): Promise<Result<State>> {
+  if(stateRead)return stateRead;
+  const revision=stateRevision;
+  const request:Promise<Result<State>>=fetchState().then(result=>revision===stateRevision?result:getState());stateRead=request;
+  const clear=()=>{if(stateRead===request)stateRead=undefined;};
+  void request.then(clear,clear);
+  return request;
+}
 const saveConfig = callable<[string, string, Rules, boolean, number], Result<State>>('save_config');
 const deleteConfig = callable<[string, number], Result<State>>('delete_config');
 const setHardware = callable<[string | null, number | null, number | null], Result<State['hardware']>>('set_hardware');
@@ -70,13 +83,15 @@ let pending: [number, number] | undefined;
 let rumbleWrite: Promise<void> | undefined;
 let writeError = '';
 let outstanding = 0;
+const rumbleListeners=new Set<(error:string)=>void>();
 const stateListeners = new Set<() => void>();
+let gameTrackingMode='initializing';
 const enqueue = <T,>(action: () => Promise<Result<T>>): Promise<T> => {
   outstanding++;
   // then() hands the previous value to its callback. Never forward it: a
   // zero-argument callable would otherwise reach Python with one extra
   // positional argument and fail before its body runs.
-  const next = chain.then(() => action()).then(r => {if (!r.ok) throw new Error(errorText(r.error)); return r.data;}).finally(()=>{outstanding--;});
+  const next = chain.then(() => {invalidateState();return action().finally(invalidateState);}).then(r => {if (!r.ok) throw new Error(errorText(r.error)); return r.data;}).finally(()=>{outstanding--;});
   chain = next.catch(e => {writeError = String(e);});
   return next;
 };
@@ -88,8 +103,8 @@ function flushRumble() {
   const [left,right] = pending; pending = undefined;
   writeError = '';
   const write = enqueue(() => setHardware(null,left,right)).then(
-    () => {writeError = '';},
-    e => {writeError = String(e); throw e;});
+    () => {writeError = '';if(!pending && rumbleWrite===write)rumbleListeners.forEach(fn=>fn(''));},
+    e => {writeError = String(e);if(!pending && rumbleWrite===write)rumbleListeners.forEach(fn=>fn(writeError));throw e;});
   rumbleWrite = write;
   const settled = () => {if (rumbleWrite === write) rumbleWrite = undefined;};
   void write.then(settled, settled);
@@ -175,9 +190,12 @@ function RumblePanel({c,shared=true}: {c: Controller; shared?: boolean}) {
     const next: [number,number] = [...values]; next[index] = value; setValues(next);setSaving(true);
     scheduleRumble(...next);
   }
-  useEffect(() => {if(!saving) return; const id=setInterval(() => {
-    if(!pending) void chain.then(() => {setSaving(false);setError(writeError);if(writeError) void c.refresh();});
-  },250);return () => clearInterval(id);},[saving]);
+  useEffect(()=>{let active=true;
+    const complete=(error:string)=>{if(active){setSaving(false);setError(error);if(error)void c.refresh().catch(()=>{});}};
+    rumbleListeners.add(complete);return ()=>{active=false;rumbleListeners.delete(complete);};
+  },[]);
+  const refreshTimer=useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(()=>()=>clearTimeout(refreshTimer.current),[]);
   const result = c.state?.rumble_test;
   return <PanelSection title={shared?t('震动 · 所有游戏共用','Rumble · shared by all games'):t('震动','Rumble')}>
     {[0,1].map(i => <PanelSectionRow key={i}><SliderField label={(i===0?t('左','Left'):t('右','Right'))+` ${values[i]}%`}
@@ -198,8 +216,8 @@ function RumblePanel({c,shared=true}: {c: Controller; shared?: boolean}) {
         } catch(e) {
           setError(t('测试调用失败：','Test call failed: ')+String(e));
         } finally {setTesting(false);}
-        setTimeout(()=>{void c.refresh();},350);
-        setTimeout(()=>{void c.refresh();},1100);
+        clearTimeout(refreshTimer.current);
+        refreshTimer.current=setTimeout(()=>{void c.refresh().catch(()=>{});},1100);
       })();
     }}>{testing?t('测试中…','Testing…'):t('测试震动 · 0.5 秒','Test rumble · 0.5 seconds')}</ButtonItem></PanelSectionRow>
     {result?.state==='running'&&row(t('正在发送震动…','Sending the pulse…'))}
@@ -422,7 +440,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.32 · GPL-3.0-only')}
+        {row('0.1.0-alpha.33 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {maintenancePending&&row(t('正在维护，请等待 Decky 自动重启，暂时不要操作。','Maintenance in progress. Wait for Decky to restart; avoid operating the plugin.'))}
         {maintenanceError&&row(maintenanceError)}
@@ -438,38 +456,33 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
       <PanelSection title={t('诊断信息','Diagnostics')}>
         <PanelSectionRow><ButtonItem layout="below" disabled={c.busy} onClick={()=>void c.run(async()=>{})}>{t('刷新诊断','Refresh diagnostics')}</ButtonItem></PanelSectionRow>
         {s.last_error&&row(t('最近的后端错误：','Last backend error: ')+s.last_error)}
-        {row(JSON.stringify({pid:s.pid, started:s.started, managed:s.managed, consistent:s.consistent, hardware:s.hardware, hardware_error:s.hardware_error, inputplumber:s.inputplumber, inputplumber_error:s.inputplumber_error, can_test:s.can_test, rumble_test:s.rumble_test, last_error:s.last_error, call_log:s.call_log},null,2))}
+        {row(JSON.stringify({game_tracking:gameTrackingMode,pid:s.pid, started:s.started, managed:s.managed, consistent:s.consistent, hardware:s.hardware, hardware_error:s.hardware_error, inputplumber:s.inputplumber, inputplumber_error:s.inputplumber_error, can_test:s.can_test, rumble_test:s.rumble_test, last_error:s.last_error, call_log:s.call_log},null,2))}
       </PanelSection>
     </>}
   </>;
 }
 
 export default definePlugin(()=>{
-  let last:string|null|undefined;let reported:string|null|undefined;let stable=0;let ticking=false;
-  const tick=async()=>{
-    if(ticking)return;ticking=true;
+  const stopMonitor=monitorGame(()=>Router.MainRunningApp,async(id,name)=>{invalidateState();try{return await reportGame(id,name);}finally{invalidateState();}},()=>stateListeners.forEach(fn=>fn()),notify=>{
+    const cleanups:(()=>void)[]=[];let observed=false;
     try {
-      const app=Router.MainRunningApp;
-      const candidate=app?.appid?String(app.appid):undefined;
-      const id=!app || (!app.appid && !app.display_name)?'default':reliableGame(candidate)?candidate:null;
-      // Only a change is worth a backend call. The old periodic re-report fed a
-      // 5 s backend poll; both are gone now.
-      if(id===reported)return;
-      stable=id===last?stable+1:0;last=id;
-      if(stable<2)return;
-      const result=await reportGame(id,app?.display_name??'');
-      if(!result.ok)throw new Error(result.error);
-      reported=id;
-      stateListeners.forEach(fn=>fn());
-    } catch {reported=undefined;await reportGame(null,'').catch(()=>{});stateListeners.forEach(fn=>fn());} finally {ticking=false;}
-  };
-  const interval=setInterval(()=>void tick(),1000);
+      const mobx=findModule(m=>typeof m?.reaction==='function'&&typeof m?.getDependencyTree==='function');
+      if(mobx){
+        const dispose=mobx.reaction(()=>JSON.stringify([Router.MainRunningApp?.appid,Router.MainRunningApp?.display_name]),notify);
+        if(mobx.getDependencyTree(dispose)?.dependencies?.length){cleanups.push(dispose);observed=true;}
+        else dispose();
+      }
+    }catch{/* An unobservable Router uses the compatibility timer. */}
+    try {const lifetime=SteamClient.GameSessions.RegisterForAppLifetimeNotifications(notify);cleanups.push(()=>lifetime.unregister());}catch{/* Older Steam client. */}
+    gameTrackingMode=observed?'events':'compatibility-5s';
+    return {observed,dispose:()=>cleanups.forEach(fn=>{try{fn();}catch{/* Continue disposing remaining listeners. */}})};
+  });
   routerHook.addRoute(route,()=> <SidebarNavigation title="MSI Claw A8 Controller Suite" showTitle pages={[
     {title:t('按键配置','Button configurations'),content:<Settings page="configs"/>,route:route+'/configs'},
     {title:t('手柄设置','Device settings'),content:<Settings page="hardware"/>,route:route+'/hardware'},
     {title:t('维护与关于','Maintenance and about'),content:<Settings page="about"/>,route:route+'/about'},
   ]}/>);
   return {name:'MSI Claw A8 Controller Suite',icon:<span>🎮</span>,content:<QuickPanel/>,onDismount(){
-    clearInterval(interval);routerHook.removeRoute(route);void flushRumble().catch(()=>{});
+    stopMonitor();routerHook.removeRoute(route);void flushRumble().catch(()=>{});
   }};
 });

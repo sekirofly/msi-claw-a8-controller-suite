@@ -1,6 +1,6 @@
 # MSI Claw A8 Controller Suite
 
-Alpha.32 combines plugin/controller repair while retaining mappings. Clear configurations and reinstall removes mappings. Both maintenance actions reset the internal controller and require a handheld reboot; hardware settings are not backed up or reapplied. An inline notice asks users to wait for Decky. Ordinary updates do not reset the controller.
+Alpha.33 reduces idle timers and disk writes with event-driven game tracking, compatibility-only checks and save-completion notifications. calls.log retains one rotated backup, about 128KiB combined. Actual power savings require hardware measurement.
 
 > Fresh installs default to enabled. Explicit disable persists across reboot until enabled again. Restoration means system defaults, not another plugin’s or an earlier custom configuration.
 
@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md)
 
 A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / BZ2EM)**, combining the hardware controls from [MSI Claw A8 Back Buttons & Rumble](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble) with selected InputPlumber integration inspired by [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber).
 
-**Status: v0.1.0-alpha.32 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
+**Status: v0.1.0-alpha.33 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
 
 ## Install / update the preview
 
@@ -16,7 +16,7 @@ A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / B
 2. In SteamOS Desktop Mode, open Konsole and run as your normal desktop user:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.32/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.33/install.sh | bash
 ```
 
 3. **Save work and reboot before returning to Gaming Mode.** If vibration remains unavailable after reboot, an EC reset may help; follow [MSI's official EC reset guidance](https://www.msi.com/support/technical_details/HH_EC_Reset). EC reset is not required routinely and is never automated.
@@ -32,9 +32,9 @@ Maintenance provides Repair plugin and controller, Clear configurations and rein
 
 ```sh
 # Clean reinstall: clear mappings, retain enabled/disabled choice, install again
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.32/install.sh | bash -s -- reinstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.33/install.sh | bash -s -- reinstall
 # Clean uninstall
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.32/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.33/install.sh | bash -s -- uninstall
 # Offline clean uninstall using installed code
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```

@@ -83,8 +83,8 @@ class InputPlumber:
         atomic_json(self.preference_path, {'enabled': enabled, 'restore_pending': not enabled})
         self.enabled, self.restore_pending, self.ready = enabled, not enabled, False
 
-    def discover(self):
-        identity = self.hardware.discover()
+    def discover(self, identity=None):
+        identity = identity or self.hardware.discover()
         matches = []
         for path in self.bus.paths():
             sources = self.bus.property(path, IFACE, 'SourceDevicePaths')
@@ -132,8 +132,8 @@ class InputPlumber:
                     raise
                 time.sleep(.1)
 
-    def status(self):
-        path, identity = self.discover()
+    def status(self, identity=None):
+        path, identity = self.discover(identity)
         profile = self.profile(path)
         capabilities = self.bus.property(path, IFACE, 'Capabilities')
         return {'path': path, 'identity': identity, 'targets': self.targets(path),
