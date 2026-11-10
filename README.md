@@ -2,7 +2,7 @@
 
 A Decky plugin for the embedded controller on **MSI Claw A8 (BZ2EM / MS-1T8K)**. Community software, not an MSI product; other Claw models are outside the supported scope.
 
-[简体中文](README.zh-CN.md) · [Implementation status](docs/implementation-status.md)
+[简体中文](README.zh-CN.md)
 
 ## Interface preview
 
