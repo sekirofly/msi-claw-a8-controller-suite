@@ -186,7 +186,7 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
     const handle={Close(){if(closed)return;closed=true;modal.unmount();options?.fnOnClose?.();}};
     modalHandle=handle;return handle;
   }};
-  for(const n of ['ButtonItem','DialogButton','PanelSection','PanelSectionRow','SliderField','ToggleField','DropdownItem','ConfirmModal','SidebarNavigation','Focusable'])
+  for(const n of ['ButtonItem','DialogButton','PanelSection','PanelSectionRow','SliderField','ToggleField','DropdownItem','ConfirmModal','ModalRoot','SidebarNavigation','Focusable'])
     ui[n]=props=>React.createElement(n,props,props.children);
   const api={definePlugin:f=>f,routerHook:{addRoute:(_,f)=>{factory=f},removeRoute(){}},callable:name=>async(...args)=>{
     calls.push([name,...args]);
@@ -204,11 +204,21 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
   const original=mod.require.bind(mod);mod.require=n=>n==='@decky/ui'?ui:n==='@decky/api'?api:original(n);mod._compile(compiled,filename);
   const plugin=mod.exports.default();let quick,nav,page;
   try{
-    await act(async()=>{quick=create(plugin.content);nav=create(factory())});
+    // The summary block sits 40 px into the scrolled content, so a correct
+    // reveal lands on 40 - not on 0 - and must not simply assume "the top".
+    const scroller={scrollTop:180,scrollHeight:3000,clientHeight:700,clientTop:0,parentElement:null,
+      getBoundingClientRect:()=>({top:100,left:0,right:500,bottom:800,width:500,height:700})};
+    const topNode={parentElement:scroller,
+      getBoundingClientRect:()=>({top:-40,left:0,right:500,bottom:280,width:500,height:320})};
+    await act(async()=>{quick=create(plugin.content,{createNodeMock:e=>
+      e.type==='div'&&e.props.onFocusCapture?topNode:null});nav=create(factory())});
     const card=quick.root.findByType('DialogButton');
     assert.match(text(card),/Same · ID 1/);
     assert.equal(card.findAllByType('Focusable').length,0);
     assert.equal(quick.root.findAllByType('DialogButton').length,1);
+    const summaryWrapper=quick.root.findAll(n=>n.type==='div'&&n.props.onFocusCapture)[0];
+    await act(async()=>{summaryWrapper.props.onFocusCapture();await new Promise(r=>setTimeout(r,15))});
+    assert.equal(scroller.scrollTop,40,'focus aligns the summary block with the scroller, without assuming it is the first row');
     await act(async()=>{page=create(nav.root.findByType('SidebarNavigation').props.pages[0].content,
       {createNodeMock:e=>e.type==='Focusable'?{querySelector:()=>({focus:()=>focus.push('page')})}:null})});
     const section=label=>page.root.findAllByType('PanelSection').find(x=>x.props.title===label);
@@ -247,10 +257,19 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
     assert.equal(save[1],'1');assert.equal(save[2],'Same','ID suffix is presentation only');
     assert.deepEqual(save[3],{M2:['X']});assert.equal(save[4],false);
     assert.deepEqual(state.config.games['2'].rules,{M2:['X']},'source unchanged');
-    // Confirm deletion uses the selected ID, never the ambiguous name.
+    // Deletion opens a destructive dialog whose first, focused action is Cancel:
+    // a reflex A press must keep the configuration.
     await act(async()=>{section('Same · ID 2').findAllByType('DialogButton')[1].props.onClick()});
-    assert.match(modal.root.findByType('ConfirmModal').props.strDescription,/Same · ID 2/);
-    await act(async()=>{modal.root.findByType('ConfirmModal').props.onOK();modalHandle.Close()});
+    const danger=()=>modal.root.findByType('ModalRoot');
+    assert.match(text(danger()),/Same · ID 2/);
+    const dangerButtons=danger().findAllByType('DialogButton');
+    assert.equal(dangerButtons.length,2);
+    assert.equal(String(dangerButtons[0].props.children),zh?'取消':'Cancel','cancel is the first action');
+    await act(async()=>{dangerButtons[0].props.onClick()});
+    assert.ok(!calls.some(c=>c[0]==='delete_config'),'cancel deletes nothing');
+    assert.ok(state.config.games['2'],'cancel keeps the configuration');
+    await act(async()=>{section('Same · ID 2').findAllByType('DialogButton')[1].props.onClick()});
+    await act(async()=>{danger().findAllByType('DialogButton')[1].props.onClick()});
     await waitFor(()=>calls.some(c=>c[0]==='delete_config'));
     assert.equal(calls.find(c=>c[0]==='delete_config')[1],'2');
     assert.ok(state.config.games['1']);assert.equal(state.config.games['2'],undefined);
