@@ -254,7 +254,8 @@ class Plugin:
                     shutil.copyfile(root / name, directory / name)
                 subprocess.run(['systemd-run', '--unit=msi-claw-a8-controller-suite-maintenance', '--on-active=3s',
                                 '--collect', '/usr/bin/python3', str(directory / 'maintenance_runner.py'),
-                                action, '--decky-home', str(home)], check=True, capture_output=True, text=True, timeout=15)
+                                action, '--decky-home', str(home),
+                                *(['--reset-controller'] if action != 'uninstall' else [])], check=True, capture_output=True, text=True, timeout=15)
             except Exception:
                 shutil.rmtree(directory)
                 raise

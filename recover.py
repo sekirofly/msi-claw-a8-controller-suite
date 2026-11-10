@@ -9,7 +9,12 @@ from backend.inputplumber import InputPlumber
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--settings-dir', required=True, type=Path)
+    parser.add_argument('--reset-controller', action='store_true')
     args = parser.parse_args()
+    if args.reset_controller:
+        Hardware().reset_controller()
+        print('Controller reset requested. Reboot the handheld to complete recovery.')
+        raise SystemExit(0)
     ip = InputPlumber(Hardware(), args.settings_dir / 'management.json')
     ip.set_enabled(False)
     ip.restore()

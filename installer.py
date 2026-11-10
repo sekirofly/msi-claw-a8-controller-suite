@@ -15,7 +15,7 @@ import urllib.error
 import time
 import zipfile
 
-VERSION = "0.1.0-alpha.31"
+VERSION = "0.1.0-alpha.32"
 REPO = "https://github.com/sekirofly/msi-claw-a8-controller-suite"
 NAME = "MSI Claw A8 Controller Suite"
 FOLDER = "msi-claw-a8-controller-suite"
@@ -160,7 +160,7 @@ def restore_before_removal(home, staged=None, skip=False):
         raise ValueError('System defaults were not restored; installation preserved. ' + detail[-800:])
 
 
-def transact(home, action, staged=None, skip_restore=False):
+def transact(home, action, staged=None, skip_restore=False, reset_controller=False):
     """Move only this plugin's directories; roll back if service restart fails."""
     home = validate_home(home)
     target = home / 'plugins' / FOLDER
@@ -173,6 +173,7 @@ def transact(home, action, staged=None, skip_restore=False):
     stopped = False
     cleanup = False
     retained = {}
+    reset_error = None
     try:
         service('stop')
         stopped = True
@@ -204,6 +205,15 @@ def transact(home, action, staged=None, skip_restore=False):
                 destination = settings / name
                 destination.write_bytes(content)
                 destination.chmod(0o600)
+        if reset_controller and action != 'uninstall':
+            try:
+                result = subprocess.run(['python3', str(target / 'recover.py'), '--settings-dir',
+                                         str(home / 'settings' / FOLDER), '--reset-controller'],
+                                        capture_output=True, text=True, timeout=30)
+                if result.returncode != 0:
+                    raise ValueError((result.stderr or result.stdout or 'Controller reset failed')[-800:])
+            except Exception as exc:
+                reset_error = str(exc)
         service('start')
         service('is-active')
         cleanup = True
@@ -229,6 +239,9 @@ def transact(home, action, staged=None, skip_restore=False):
         if cleanup:
             shutil.rmtree(backup, ignore_errors=True)
 
+    if reset_error:
+        raise ValueError('Plugin files installed, but controller reset failed. Decky restarted. ' + reset_error)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -236,10 +249,15 @@ def main():
     parser.add_argument('--decky-home', default=str(Path.home() / 'homebrew'))
     parser.add_argument('--skip-restore', action='store_true',
                         help='skip restoring system defaults during uninstall')
+    parser.add_argument('--reset-controller', action='store_true', help='reset the internal A8 controller after installation; requires handheld reboot')
     args = parser.parse_args()
+    if args.reset_controller and args.action == 'uninstall':
+        parser.error('--reset-controller is not an uninstall option')
     home = validate_home(args.decky_home)
     if os.geteuid() != 0:
         extra = ['--skip-restore'] if args.skip_restore else []
+        if args.reset_controller:
+            extra.append('--reset-controller')
         os.execvp('sudo', ['sudo', 'python3', str(Path(__file__).resolve()), args.action,
                             '--decky-home', str(home), *extra])
     import fcntl
@@ -254,12 +272,15 @@ def main():
                 if len(expected) != 64 or hashlib.sha256(data).hexdigest() != expected:
                     raise ValueError('Release checksum mismatch; existing installation unchanged')
                 staged = unpack(data, Path(directory))
-            transact(home, args.action, staged, skip_restore=args.skip_restore)
+            transact(home, args.action, staged, skip_restore=args.skip_restore, reset_controller=args.reset_controller)
     label = {'install': '安装完成 / Installation complete.',
              'reinstall': '重装完成 / Reinstallation complete.',
              'uninstall': '卸载完成 / Uninstallation complete.'}[args.action]
     print('MSI Claw A8 Controller Suite: ' + label)
-    print('背键硬件模式和左右震动强度保持不变。 / Back-button hardware mode and left/right rumble strengths were preserved.')
+    if args.reset_controller:
+        print('手柄已请求软件重置，设置可能回到设备默认值。请保存工作并重启掌机。 / Controller reset requested; settings may return to defaults. Save work and reboot the handheld.')
+    else:
+        print('背键硬件模式和左右震动强度保持不变。 / Back-button hardware mode and left/right rumble strengths were preserved.')
     if args.action != 'uninstall':
         print('首次安装默认启用管理；更新/重装保留已保存的启用或停用选择。 / First install enables management by default; updates/reinstalls retain your saved choice.')
         print('插件启动后按该选择运行。安装完成不代表手柄配置已生效，请在插件中查看状态。 / Management follows that choice at startup. Installation success does not confirm controller configuration was applied; check the plugin status.')

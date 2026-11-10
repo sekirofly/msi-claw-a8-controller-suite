@@ -66,6 +66,18 @@ class Hardware:
             raise SuiteError('invalid_hardware_state')
         return {'mode': mode, 'left': left, 'right': right, 'identity': identity['usb']}
 
+    def reset_controller(self):
+        """Reset only the verified internal controller; do not save/reapply settings."""
+        if os.geteuid() != 0:
+            raise SuiteError('root_required')
+        identity = self.discover()
+        reset = identity['path'] / 'reset'
+        if not reset.is_file() or reset.is_symlink():
+            raise SuiteError('reset_unavailable')
+        if self.discover()['path'] != identity['path']:
+            raise SuiteError('device_changed')
+        reset.write_text('1\n', encoding='ascii')
+
     def set(self, mode=None, left=None, right=None):
         if os.geteuid() != 0:
             raise SuiteError('root_required')

@@ -17,7 +17,7 @@ const waitFor=async(check,timeout=1000)=>{const start=Date.now();
 
 for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble ordering: ${language}`,async()=>{
   Object.defineProperty(global,'navigator',{value:{language},configurable:true});
-  const calls=[];let factory;let release;let failSave=false;
+  const calls=[];let factory;let release;let failSave=false;let failMaintenance=true;
   const hardware={mode:'macro',left:50,right:50};
   const state={config:{revision:0,default:{M2:['B'],M1:[]},games:{}},game:'1',game_name:'Game One',
     applied:'default',managed:true,paused:false,hardware,can_test:true,inputplumber:{sources:['M1','M2']}};
@@ -27,6 +27,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
   const api={definePlugin:f=>f,routerHook:{addRoute:(_,f)=>{factory=f},removeRoute(){}},callable:name=>async(...args)=>{
     calls.push([name,...args]);
     if(name==='set_hardware') {await new Promise(r=>{release=r});if(failSave)return {ok:false,error:'readback_failed'};hardware.left=args[1];hardware.right=args[2];return {ok:true,data:hardware};}
+    if(name==='maintenance')return failMaintenance?{ok:false,error:'operation_failed'}:{ok:true,data:true};
     if(name==='get_state')return {ok:true,data:JSON.parse(JSON.stringify(state))};
     if(name==='set_management') {state.managed=args[0];state.apply_error=null;return {ok:true,data:state};}
     return {ok:true,data:true};
@@ -131,6 +132,15 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       await act(async()=>{await disable.props.onClick();await new Promise(r=>setTimeout(r,10))});
       assert.deepEqual(calls.filter(x=>x[0]==='set_management').at(-1),['set_management',false]);
       assert.match(JSON.stringify(settings.toJSON()),language==='zh-CN'?/启用管理/:/Enable management/);
+      const maintenanceLabels=language==='zh-CN'?['修复插件与手柄','清除配置并重新安装','干净卸载']:['Repair plugin and controller','Clear configurations and reinstall','Clean uninstall'];
+      const maintenanceButtons=()=>settings.root.findAllByType('ButtonItem').filter(x=>maintenanceLabels.includes(x.props.children));
+      assert.equal(maintenanceButtons().length,3);
+      await act(async()=>{maintenanceButtons()[0].props.onClick();await new Promise(r=>setTimeout(r,10))});
+      assert.ok(maintenanceButtons().every(x=>!x.props.disabled),'submission failure allows retry');
+      failMaintenance=false;
+      await act(async()=>{maintenanceButtons()[0].props.onClick();await new Promise(r=>setTimeout(r,10))});
+      assert.ok(maintenanceButtons().every(x=>x.props.disabled));
+      assert.match(JSON.stringify(settings.toJSON()),language==='zh-CN'?/正在维护，请等待 Decky 自动重启/:/Maintenance in progress/);
       // Management moved to maintenance; the device page keeps only hardware controls.
       const pages=navigation.root.findByType('SidebarNavigation').props.pages;
       assert.equal(pages.length,3);

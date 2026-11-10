@@ -1,5 +1,9 @@
 # Initial implementation status
 
+## Alpha.32: combined plugin/controller repair
+
+Repair retains mappings; clean reinstall clears them. Both maintenance actions reset the verified internal controller after installing files and require a handheld reboot. No hardware settings backup/reapply. Ordinary updates remain file-only. Show an inline wait message and disable maintenance buttons after confirmation; submission failure allows retry. Uninstall restores system defaults. Background failure restarts Decky to release pending state, with the error retained in its journal.
+
 ## Alpha.31: settings action at the top
 
 Remove the version anchor, styling and focus state. Move the existing Open settings action to the very top without a duplicate at the bottom. Preserve status rows and contextual editor actions.

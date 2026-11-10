@@ -238,6 +238,34 @@ class InstallerTests(unittest.TestCase):
                 self.assertFalse(json.loads((settings / 'management.json').read_text())['enabled'])
                 self.assertFalse((settings / 'config.json').exists())
 
+    def test_repair_reset_runs_after_copy_and_before_decky_restart(self):
+        staged = self.home / 'stage'
+        staged.mkdir()
+        (staged / 'recover.py').write_text('# new reset helper')
+        events = []
+        def reset(*args, **kwargs):
+            self.assertTrue((self.target / 'recover.py').exists())
+            self.assertIn('--reset-controller', args[0])
+            events.append('reset')
+            return subprocess.CompletedProcess([], 0, '', '')
+        with patch.object(installer, 'service', side_effect=events.append), \
+             patch.object(installer.os, 'chown'), patch.object(installer.subprocess, 'run', side_effect=reset):
+            installer.transact(self.home, 'install', staged, reset_controller=True)
+        self.assertEqual(events, ['stop', 'reset', 'start', 'is-active'])
+
+    def test_reset_failure_keeps_repaired_files_and_restarts_decky(self):
+        staged = self.home / 'stage'
+        staged.mkdir()
+        (staged / 'recover.py').write_text('# repaired helper')
+        events = []
+        with patch.object(installer, 'service', side_effect=events.append), \
+             patch.object(installer.os, 'chown'), patch.object(installer.subprocess, 'run',
+                return_value=subprocess.CompletedProcess([], 1, '', 'reset unavailable')):
+            with self.assertRaisesRegex(ValueError, 'files installed, but controller reset failed'):
+                installer.transact(self.home, 'reinstall', staged, reset_controller=True)
+        self.assertEqual(events, ['stop', 'start', 'is-active'])
+        self.assertEqual((self.target / 'recover.py').read_text(), '# repaired helper')
+
 
 if __name__ == '__main__':
     unittest.main()
