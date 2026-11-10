@@ -1,5 +1,11 @@
 # Initial implementation status
 
+## Alpha.25: no trailing control boxes, no half-width buttons
+
+- The quick panel is one full-width action button plus plain information rows. Passing text as the ``ButtonItem`` child put it in Steam's trailing control field, which rendered as a white box next to the label; the scope now has its own information row and the button carries only the action.
+- A configuration without a delete action lets Edit span the whole row. The previous markup reserved the other half for an invisible placeholder, so the button looked off-centre.
+- Tests locate the summary by its chevron and assert the scope is plain information, in both languages.
+
 ## Alpha.24: every action button the same shape
 
 - Action buttons are ``ButtonItem`` elements whose text is their only child. Without ``layout="below"`` that child lands in the trailing field, so each button drew a box sized to its own label: the three hardware modes and the maintenance actions looked ragged.
