@@ -357,19 +357,15 @@ function QuickPanel() {
   // the rows below stay plain information rather than a tall clickable block.
   return <><Feedback c={c}/>{s&&<PanelSection>
     <PanelSectionRow>
-      <DialogButton disabled={c.busy}
-        onClick={()=>open(game??'default',game?s.game_name:t('默认按键','Default buttons'))}
-        style={{width:'100%',textAlign:'left',padding:12,whiteSpace:'normal',overflowWrap:'anywhere'}}>
-        <div style={{display:'flex',alignItems:'baseline',gap:12,justifyContent:'space-between'}}>
-          <span style={{fontSize:16,fontWeight:600,minWidth:0}}>{t('当前按键：','Current buttons: ')+current}</span>
-          <span style={{fontSize:14,flexShrink:0}}>{game&&!s.config.games[game]
-            ?t('为本游戏设置 ›','Customize ›'):t('编辑 ›','Edit ›')}</span>
-        </div>
-      </DialogButton>
+      <ButtonItem disabled={c.busy}
+        label={t('当前按键：','Current buttons: ')+current}
+        onClick={()=>open(game??'default',game?s.game_name:t('默认按键','Default buttons'))}>
+        {game&&!s.config.games[game]?t('为本游戏设置 ›','Customize ›'):t('编辑 ›','Edit ›')}
+      </ButtonItem>
     </PanelSectionRow>
     {row(t('游戏：','Game: ')+gameText)}
     {s.managed&&rules&&['M2','M1'].map(key=>row(buttonLabel(key)+' → '+outputLabel(key)))}
-  </PanelSection>}<RumblePanel c={c}/><PanelSection><PanelSectionRow><ButtonItem onClick={()=>open()}>{t('打开设置','Open settings')}</ButtonItem></PanelSectionRow></PanelSection></>;
+  </PanelSection>}<RumblePanel c={c}/><PanelSection><PanelSectionRow><ButtonItem layout="below" onClick={()=>open()}>{t('打开设置','Open settings')}</ButtonItem></PanelSectionRow></PanelSection></>;
 }
 
 function Settings({page}:{page:'configs'|'hardware'|'about'}) {
@@ -420,7 +416,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.22 · GPL-3.0-only')}
+        {row('0.1.0-alpha.23 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
           action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装当前版本','Repair current version'),
