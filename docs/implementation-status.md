@@ -1,5 +1,9 @@
 # Initial implementation status
 
+## Alpha.31: settings action at the top
+
+Remove the version anchor, styling and focus state. Move the existing Open settings action to the very top without a duplicate at the bottom. Preserve status rows and contextual editor actions.
+
 ## Alpha.30: precise editor labels and a text-like version anchor
 
 Restore explicit default/create-game/edit-game action labels. Keep native version navigation without button background, border or block highlight; focus is indicated by text underline only. Activation remains a no-op. Native Steam styling requires hardware confirmation.
