@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_RE = re.compile(r'\d+\.\d+\.\d+-alpha\.\d+')
+VERSION_RE = re.compile(r'\d+\.\d+\.\d+(?:-alpha\.\d+)?')
 
 
 def find(pattern, relative, flags=0):
@@ -27,13 +27,13 @@ def find(pattern, relative, flags=0):
 def main():
     version = json.loads((ROOT / 'package.json').read_text(encoding='utf-8'))['version']
     if not VERSION_RE.fullmatch(version):
-        print(f'FAIL package.json version {version!r} is not vX.Y.Z-alpha.N')
+        print(f'FAIL package.json version {version!r} is not X.Y.Z or X.Y.Z-alpha.N')
         return 1
     checks = [
         ('plugin.json', find(r'"version"\s*:\s*"([^"]+)"', 'plugin.json')),
         ('installer.py', find(r'^VERSION\s*=\s*"([^"]+)"', 'installer.py', re.MULTILINE)),
-        ('install.sh', find(r'/v(\d+\.\d+\.\d+-alpha\.\d+)/installer\.py', 'install.sh')),
-        ('src/index.tsx', find(r"'(\d+\.\d+\.\d+-alpha\.\d+) · GPL", 'src/index.tsx')),
+        ('install.sh', find(r'/v(\d+\.\d+\.\d+(?:-alpha\.\d+)?)/installer\.py', 'install.sh')),
+        ('src/index.tsx', find(r"'(\d+\.\d+\.\d+(?:-alpha\.\d+)?) · GPL", 'src/index.tsx')),
     ]
     failed = False
     for name, found in checks:

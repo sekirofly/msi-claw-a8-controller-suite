@@ -15,7 +15,7 @@ import urllib.error
 import time
 import zipfile
 
-VERSION = "0.1.0-alpha.33"
+VERSION = "0.1.0"
 REPO = "https://github.com/sekirofly/msi-claw-a8-controller-suite"
 NAME = "MSI Claw A8 Controller Suite"
 FOLDER = "msi-claw-a8-controller-suite"
@@ -278,17 +278,12 @@ def main():
              'uninstall': '卸载完成 / Uninstallation complete.'}[args.action]
     print('MSI Claw A8 Controller Suite: ' + label)
     if args.reset_controller:
-        print('手柄已请求软件重置，设置可能回到设备默认值。请保存工作并重启掌机。 / Controller reset requested; settings may return to defaults. Save work and reboot the handheld.')
+        print('手柄已软件重置，硬件设置可能恢复默认。请保存工作并重启掌机。 / Controller reset; hardware settings may return to defaults. Save work and reboot the handheld.')
+    elif args.action == 'install':
+        print('已有按键方案和管理选择已保留。请重启掌机后检查插件状态。 / Existing mappings and management choice retained. Reboot the handheld and check plugin status.')
     else:
-        print('背键硬件模式和左右震动强度保持不变。 / Back-button hardware mode and left/right rumble strengths were preserved.')
-    if args.action != 'uninstall':
-        print('首次安装默认启用管理；更新/重装保留已保存的启用或停用选择。 / First install enables management by default; updates/reinstalls retain your saved choice.')
-        print('插件启动后按该选择运行。安装完成不代表手柄配置已生效，请在插件中查看状态。 / Management follows that choice at startup. Installation success does not confirm controller configuration was applied; check the plugin status.')
-    print('Preview release: disable/remove the original DeckyPlumber and Back Buttons & Rumble plugins before enabling management. Existing suite button configurations are kept on install/update; clean reinstall clears mappings; uninstall restores system defaults.')
-    print('IMPORTANT: Save your work and reboot normally before returning to Gaming Mode. Controller detection after a live Decky restart is not reliable on the tested A8.')
-    if args.action != 'uninstall':
-        print('If rumble or controller behavior remains abnormal after reboot, an EC reset may be needed. It resolved a reported loss of rumble on the tested A8; it is not required for every installation.')
-        print('Follow MSI official EC reset guidance: https://www.msi.com/support/technical_details/HH_EC_Reset')
+        print('请正常重启掌机。 / Reboot the handheld.')
+
 
 
 if __name__ == '__main__':

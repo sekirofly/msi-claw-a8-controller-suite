@@ -81,7 +81,6 @@ let chain: Promise<unknown> = Promise.resolve();
 let rumbleTimer: ReturnType<typeof setTimeout> | undefined;
 let pending: [number, number] | undefined;
 let rumbleWrite: Promise<void> | undefined;
-let writeError = '';
 let outstanding = 0;
 const rumbleListeners=new Set<(error:string)=>void>();
 const stateListeners = new Set<() => void>();
@@ -92,7 +91,7 @@ const enqueue = <T,>(action: () => Promise<Result<T>>): Promise<T> => {
   // zero-argument callable would otherwise reach Python with one extra
   // positional argument and fail before its body runs.
   const next = chain.then(() => {invalidateState();return action().finally(invalidateState);}).then(r => {if (!r.ok) throw new Error(errorText(r.error)); return r.data;}).finally(()=>{outstanding--;});
-  chain = next.catch(e => {writeError = String(e);});
+  chain = next.catch(() => {});
   return next;
 };
 function flushRumble() {
@@ -101,10 +100,9 @@ function flushRumble() {
   // a stale chain/error must not block every later test.
   if (!pending) return rumbleWrite ?? Promise.resolve();
   const [left,right] = pending; pending = undefined;
-  writeError = '';
   const write = enqueue(() => setHardware(null,left,right)).then(
-    () => {writeError = '';if(!pending && rumbleWrite===write)rumbleListeners.forEach(fn=>fn(''));},
-    e => {writeError = String(e);if(!pending && rumbleWrite===write)rumbleListeners.forEach(fn=>fn(writeError));throw e;});
+    () => {if(!pending && rumbleWrite===write)rumbleListeners.forEach(fn=>fn(''));},
+    e => {if(!pending && rumbleWrite===write)rumbleListeners.forEach(fn=>fn(String(e)));throw e;});
   rumbleWrite = write;
   const settled = () => {if (rumbleWrite === write) rumbleWrite = undefined;};
   void write.then(settled, settled);
@@ -440,7 +438,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.33 · GPL-3.0-only')}
+        {row('0.1.0 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {maintenancePending&&row(t('正在维护，请等待 Decky 自动重启，暂时不要操作。','Maintenance in progress. Wait for Decky to restart; avoid operating the plugin.'))}
         {maintenanceError&&row(maintenanceError)}
