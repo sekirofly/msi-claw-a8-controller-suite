@@ -249,12 +249,11 @@ const mappingGroups = [
   {zh:'摇杆按下',en:'Stick clicks',rows:[['LS','RS']]},
   {zh:'菜单键',en:'Menu buttons',rows:[['View','Menu']]},
 ];
-// Upstream hardware identifiers stay visible; the Chinese label translates the
-// identifier only, because each mode's exact event behaviour is still unverified.
+// Keep firmware identifiers visible; descriptions explain when to use each mode.
 const MODES = [
-  {key:'macro', zh:'Macro（宏）', en:'Macro'},
-  {key:'combination', zh:'Combination（组合键）', en:'Combination'},
-  {key:'disabled', zh:'Disabled（禁用）', en:'Disabled'},
+  {key:'macro', zh:'Macro（宏）', en:'Macro', detailZh:'SteamOS 推荐，用于本套件的左右背键映射；插件不提供宏录制。', detailEn:'Recommended on SteamOS for this suite’s back-button mappings; the plugin does not record macros.'},
+  {key:'combination', zh:'Combination（组合键）', en:'Combination', detailZh:'固件组合键模式，可能影响左右背键的独立映射。', detailEn:'Firmware combination mode; may affect independent back-button mappings.'},
+  {key:'disabled', zh:'Disabled（禁用）', en:'Disabled', detailZh:'禁用背键硬件功能。', detailEn:'Disable the hardware back-button function.'},
 ] as const;
 
 function CopyDialog({choices,onCopy,onClose}: {choices:{data:string;label:string;rules:Rules}[];onCopy:(rules:Rules)=>void;onClose:()=>void}) {
@@ -412,9 +411,9 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
           ()=>void c.run(()=>enqueue(()=>deleteConfig(id,s.config.revision))))}/>)}
     </>}
     {page==='hardware'&&<>
-      <PanelSection>{row(t('本页设置对所有游戏生效','Settings on this page apply to all games'))}</PanelSection>
+      <PanelSection>{row(t('本页设置对所有游戏生效。SteamOS 下通常保持 Macro 即可。','Settings on this page apply to all games. On SteamOS, normally keep Macro selected.'))}</PanelSection>
       <PanelSection title={t('背键硬件模式','Back-button hardware mode')}>
-        {MODES.map(mode=><PanelSectionRow key={mode.key}><ButtonItem layout="below" disabled={c.busy||!s.hardware}
+        {MODES.map(mode=><PanelSectionRow key={mode.key}><ButtonItem layout="below" description={t(mode.detailZh,mode.detailEn)} disabled={c.busy||!s.hardware}
           onClick={()=>void c.run(()=>enqueue(()=>setHardware(mode.key,null,null)))}>{s.hardware?.mode===mode.key?'● ':'○ '}{t(mode.zh,mode.en)}</ButtonItem></PanelSectionRow>)}
         {row(t('两个背键共用一个模式，点选立即写入硬件；不改变按键映射，也不会自动更改。','Both back buttons share one mode. Selecting writes it immediately; button mappings are unchanged and it is never set automatically.'))}
       </PanelSection>
@@ -436,7 +435,8 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0 · GPL-3.0-only')}
+        {row(t('震动消失时，可先尝试下方“修复插件与手柄”；完成后需重启掌机。','If rumble stops working, try Repair plugin and controller below, then reboot the handheld.'))}
+        {row('0.1.1 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {maintenancePending&&row(t('正在维护，请等待 Decky 自动重启，暂时不要操作。','Maintenance in progress. Wait for Decky to restart; avoid operating the plugin.'))}
         {maintenanceError&&row(maintenanceError)}
