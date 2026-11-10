@@ -49,15 +49,10 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     // The summary action is the only button that ends with the chevron.
     const summaryButtons=()=>rendered.root.findAllByType('ButtonItem').filter(x=>typeof x.props.children==='string'&&/编辑.*按键|创建专用按键|Edit .*buttons|Create custom buttons/.test(x.props.children));
     const summary=summaryButtons()[0];
-    const version=rendered.root.findAllByType('DialogButton').find(x=>x.props.className==='suite-version-anchor');
-    assert.match(String(version.props.children),/0\.1\.0-alpha\.30/);
-    const beforeVersion=calls.length;
-    await act(async()=>{version.props.onClick()});
-    assert.equal(calls.length,beforeVersion,'version focus anchor performs no operation');
-    assert.equal(version.props.noFocusRing,true);
-    await act(async()=>{version.props.onGamepadFocus()});
-    assert.equal(rendered.root.findAllByType('DialogButton').find(x=>x.props.className==='suite-version-anchor').props.style.textDecoration,'underline');
-    await act(async()=>{version.props.onGamepadBlur()});
+    const topActions=rendered.root.findAllByType('ButtonItem');
+    assert.equal(topActions[0].props.children,language==='zh-CN'?'打开设置':'Open settings');
+    assert.equal(topActions.filter(x=>x.props.children===(language==='zh-CN'?'打开设置':'Open settings')).length,1);
+    assert.doesNotMatch(json,/suite-version-anchor/);
 
     assert.ok(summary,'summary participates in focus navigation');
     assert.equal(summaryButtons().length,1,'one summary action, not one per line');
