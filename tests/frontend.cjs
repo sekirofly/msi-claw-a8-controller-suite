@@ -51,6 +51,9 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     const summary=summaryButtons()[0];
     assert.ok(summary,'summary participates in focus navigation');
     assert.equal(summaryButtons().length,1,'one summary action, not one per line');
+    const panelText=JSON.stringify(rendered.toJSON());
+    const infoLabel=language==='zh-CN'?'当前按键：':'Current buttons: ';
+    assert.ok(panelText.indexOf(infoLabel)<panelText.indexOf('\u203a'),'context precedes the action on screen');
     assert.equal(summary.findAllByType('Focusable').length,0,'summary has no nested focus stops');
     const elementText=node=>typeof node==='string'?node:Array.isArray(node)?node.map(elementText).join(''):
       node&&node.props?elementText(node.props.children):'';

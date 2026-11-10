@@ -1,5 +1,11 @@
 # Initial implementation status
 
+## Alpha.26: context first, action after
+
+- Alpha.25 put the edit action above the status rows to keep the focus target near the top of the panel. That inverted the information hierarchy: what the controller is currently doing is context and must be read first.
+- The rows now come first and the action sits below them. The action remains the only focus stop, so Steam reveals one small row and the context above stays adjacent; no scroll correction is involved.
+- A test pins the order in both languages, and is mutation-checked by swapping the two blocks back.
+
 ## Alpha.25: no trailing control boxes, no half-width buttons
 
 - The quick panel is one full-width action button plus plain information rows. Passing text as the ``ButtonItem`` child put it in Steam's trailing control field, which rendered as a white box next to the label; the scope now has its own information row and the button carries only the action.
