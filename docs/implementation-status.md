@@ -1,5 +1,12 @@
 # Initial implementation status
 
+## Alpha.22: one focusable row instead of a tall card
+
+- The quick panel makes only the action row focusable; the game, M2 and M1 lines are plain information again. A one-line focus target is always revealed completely by Steam's own focus scrolling, so no manual scroll correction is needed.
+- This removes ``alignToTop``/``scrollParent`` and the two-frame wait added in alpha.21: the scroll math could not remove the clipping because the target itself was five lines tall.
+- The information lines are no longer clickable; the action row carries both the current scope and the entry label.
+- A test pins the structure: exactly one focusable stop in the panel and no information text inside it (mutation-checked).
+
 ## Alpha.21: focus reveals the summary, deletion asks first
 
 - The quick panel aligns its status block with the panel's own scroll container instead of calling `scrollIntoView`. That call moves every scrollable ancestor and could stop a few pixels short, which clipped the first line under the header after scrolling down and back. The offset is computed (`scrollTop += wrapperTop - boxTop`), so the block is aligned wherever it sits and no assumption about being the first row is baked in; focus is never touched.

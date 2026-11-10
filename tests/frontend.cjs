@@ -50,8 +50,12 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     assert.ok(summary,'summary participates in focus navigation');
     assert.equal(rendered.root.findAllByType('DialogButton').length,1,'one summary stop, not one per line');
     assert.equal(summary.findAllByType('Focusable').length,0,'summary has no nested focus stops');
+    const elementText=node=>typeof node==='string'?node:Array.isArray(node)?node.map(elementText).join(''):
+      node&&node.props?elementText(node.props.children):'';
+    assert.doesNotMatch(elementText(summary.props.children),/游戏：|M2|M1/,'information rows stay outside the action row');
     assert.doesNotMatch(json,/MSI Claw A8 Controller Suite|仅管理 A8|Embedded A8 controller only/);
-    assert.equal(typeof summary.props.onGamepadFocus,'function');
+    assert.match(json,language==='zh-CN'?/游戏：/:/Game: /,'game status is plain information, not a second focus stop');
+    assert.equal(summary.props.onGamepadFocus,undefined,'the action row needs no focus hook');
     const saved=JSON.parse(JSON.stringify(state));
     for(const scenario of [
       {game:null,managed:true,applied:'default',expected:language==='zh-CN'?'游戏：正在读取…':'Game: Reading…'},
@@ -65,9 +69,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       let preview;
       try{
         await act(async()=>{preview=create(plugin.content)});
-        const card=preview.root.findByType('DialogButton');
-        const text=node=>typeof node==='string'?node:node.children.map(text).join('');
-        const content=text(card);
+        const content=JSON.stringify(preview.toJSON());
         assert.ok(content.includes(scenario.expected));
         if(scenario.game==='default')assert.ok(content.includes(language==='zh-CN'?'游戏：未运行':'Game: Not running'));
         if(scenario.game==='1')assert.ok(content.includes(language==='zh-CN'?'游戏：Game One':'Game: Game One'));
@@ -204,21 +206,11 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
   const original=mod.require.bind(mod);mod.require=n=>n==='@decky/ui'?ui:n==='@decky/api'?api:original(n);mod._compile(compiled,filename);
   const plugin=mod.exports.default();let quick,nav,page;
   try{
-    // The summary block sits 40 px into the scrolled content, so a correct
-    // reveal lands on 40 - not on 0 - and must not simply assume "the top".
-    const scroller={scrollTop:180,scrollHeight:3000,clientHeight:700,clientTop:0,parentElement:null,
-      getBoundingClientRect:()=>({top:100,left:0,right:500,bottom:800,width:500,height:700})};
-    const topNode={parentElement:scroller,
-      getBoundingClientRect:()=>({top:-40,left:0,right:500,bottom:280,width:500,height:320})};
-    await act(async()=>{quick=create(plugin.content,{createNodeMock:e=>
-      e.type==='div'&&e.props.onFocusCapture?topNode:null});nav=create(factory())});
+    await act(async()=>{quick=create(plugin.content);nav=create(factory())});
     const card=quick.root.findByType('DialogButton');
     assert.match(text(card),/Same · ID 1/);
     assert.equal(card.findAllByType('Focusable').length,0);
     assert.equal(quick.root.findAllByType('DialogButton').length,1);
-    const summaryWrapper=quick.root.findAll(n=>n.type==='div'&&n.props.onFocusCapture)[0];
-    await act(async()=>{summaryWrapper.props.onFocusCapture();await new Promise(r=>setTimeout(r,15))});
-    assert.equal(scroller.scrollTop,40,'focus aligns the summary block with the scroller, without assuming it is the first row');
     await act(async()=>{page=create(nav.root.findByType('SidebarNavigation').props.pages[0].content,
       {createNodeMock:e=>e.type==='Focusable'?{querySelector:()=>({focus:()=>focus.push('page')})}:null})});
     const section=label=>page.root.findAllByType('PanelSection').find(x=>x.props.title===label);
@@ -280,7 +272,7 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
     try{
       await act(async()=>{unknown=create(plugin.content)});
       const unknownCard=unknown.root.findByType('DialogButton');
-      assert.ok(text(unknownCard).includes(zh?'无法识别，保持当前配置':'Unrecognized; keeping current configuration'));
+      assert.ok(JSON.stringify(unknown.toJSON()).includes(zh?'无法识别，保持当前配置':'Unrecognized; keeping current configuration'));
       await act(async()=>{unknownCard.props.onClick()});
       let fallback;
       try{

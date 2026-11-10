@@ -328,37 +328,9 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
   </Focusable></FocusEntry>;
 }
 
-// Steam scrolls a newly focused element into view itself, across every scrollable
-// ancestor, and can stop a few pixels short, which clipped the first line under
-// the panel header. Align only the panel's own scroller instead: exactly one
-// container moves, the offset is computed rather than assumed, and focus is
-// never touched.
-function scrollParent(el: HTMLElement): HTMLElement | null {
-  let node = el.parentElement;
-  while (node && node.scrollHeight <= node.clientHeight + 1) node = node.parentElement;
-  return node;
-}
-function alignToTop(el: HTMLElement | null) {
-  if (!el) return;
-  const box = scrollParent(el);
-  if (!box) { el.scrollIntoView({block:'start',behavior:'auto'}); return; }
-  box.scrollTop += el.getBoundingClientRect().top - box.getBoundingClientRect().top - box.clientTop;
-}
-
 let requestedScope: {scope:string;name:string}|undefined;
 function QuickPanel() {
   const c=useController(); const s=c.state;
-  const top=useRef<HTMLDivElement>(null);
-  const frame=useRef(0);
-  useEffect(()=>()=>cancelAnimationFrame(frame.current),[]);
-  function revealTop() {
-    cancelAnimationFrame(frame.current);
-    // Wait out Steam's own focus scrolling before correcting it. Merely
-    // refreshing status must never move focus or scroll.
-    frame.current=requestAnimationFrame(()=>{
-      frame.current=requestAnimationFrame(()=>alignToTop(top.current));
-    });
-  }
   const game=s?.game_known!==false&&reliableGame(s?.game)?s.game:undefined;
   const scope=s?.applied;
   const rules=scope==='default'?s?.config.default:scope?s?.config.games[scope]?.rules:undefined;
@@ -374,22 +346,30 @@ function QuickPanel() {
     requestedScope=scope?{scope,name:name??''}:undefined;
     Navigation.Navigate(route);Navigation.CloseSideMenus();
   }
-  return <><div ref={top} onFocusCapture={revealTop} onBlurCapture={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node | null))cancelAnimationFrame(frame.current);}}><Feedback c={c}/>{s&&<PanelSection>
+  const gameText=!s?'':s.game===null
+    ?t('正在读取…','Reading…')
+    :s.game_known===false?t('无法识别，保持当前配置','Unrecognized; keeping current configuration')
+    :game?gameLabel(s,game,s.game_name)
+    :s.game==='default'?t('未运行','Not running')
+    :t('无法识别，保持当前配置','Unrecognized; keeping current configuration');
+  // Only the action row is focusable. A one-line target is always fully shown by
+  // Steam's own focus scrolling, so no manual scroll correction is needed, and
+  // the rows below stay plain information rather than a tall clickable block.
+  return <><Feedback c={c}/>{s&&<PanelSection>
     <PanelSectionRow>
-      <DialogButton disabled={c.busy} onGamepadFocus={revealTop}
+      <DialogButton disabled={c.busy}
         onClick={()=>open(game??'default',game?s.game_name:t('默认按键','Default buttons'))}
-        style={{width:'100%',height:'auto',textAlign:'left',padding:12,lineHeight:1.5,whiteSpace:'normal',overflowWrap:'anywhere'}}>
-        <div style={{fontSize:16,fontWeight:600}}>{t('当前按键：','Current buttons: ')+current}</div>
-        <div style={{fontSize:13,marginTop:4}}>{t('游戏：','Game: ')+(s.game===null
-          ?t('正在读取…','Reading…'):s.game_known===false?t('无法识别，保持当前配置','Unrecognized; keeping current configuration'):game?gameLabel(s,game,s.game_name):s.game==='default'?t('未运行','Not running'):t('无法识别，保持当前配置','Unrecognized; keeping current configuration'))}</div>
-        {s.managed&&rules&&<div style={{fontSize:14,marginTop:8}}>
-          {['M2','M1'].map(key=><div key={key}>{buttonLabel(key)+' → '+outputLabel(key)}</div>)}
-        </div>}
-        <div style={{textAlign:'right',fontSize:14,marginTop:8}}>{game&&!s.config.games[game]
-          ?t('为本游戏设置按键 ›','Customize this game ›'):t('编辑按键 ›','Edit buttons ›')}</div>
+        style={{width:'100%',textAlign:'left',padding:12,whiteSpace:'normal',overflowWrap:'anywhere'}}>
+        <div style={{display:'flex',alignItems:'baseline',gap:12,justifyContent:'space-between'}}>
+          <span style={{fontSize:16,fontWeight:600,minWidth:0}}>{t('当前按键：','Current buttons: ')+current}</span>
+          <span style={{fontSize:14,flexShrink:0}}>{game&&!s.config.games[game]
+            ?t('为本游戏设置 ›','Customize ›'):t('编辑 ›','Edit ›')}</span>
+        </div>
       </DialogButton>
     </PanelSectionRow>
-  </PanelSection>}</div><RumblePanel c={c}/><PanelSection><PanelSectionRow><ButtonItem onClick={()=>open()}>{t('打开设置','Open settings')}</ButtonItem></PanelSectionRow></PanelSection></>;
+    {row(t('游戏：','Game: ')+gameText)}
+    {s.managed&&rules&&['M2','M1'].map(key=>row(buttonLabel(key)+' → '+outputLabel(key)))}
+  </PanelSection>}<RumblePanel c={c}/><PanelSection><PanelSectionRow><ButtonItem onClick={()=>open()}>{t('打开设置','Open settings')}</ButtonItem></PanelSectionRow></PanelSection></>;
 }
 
 function Settings({page}:{page:'configs'|'hardware'|'about'}) {
@@ -440,7 +420,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.21 · GPL-3.0-only')}
+        {row('0.1.0-alpha.22 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
           action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装当前版本','Repair current version'),
