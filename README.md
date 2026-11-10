@@ -42,18 +42,26 @@ The installer verifies the release SHA-256 and restarts Decky. Updates retain ma
 
 ### Offline installation
 
-1. On a connected device, download the `msi-claw-a8-controller-suite.zip` release asset and its `.zip.sha256` checksum from [Releases](https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest). **Do not use GitHub's Source code archives.**
-2. Copy the files to the handheld, for example into `~/Downloads/`, using a USB drive. Keep the ZIP intact; do not extract it.
+1. On a connected device, download the `msi-claw-a8-controller-suite.zip` release asset from [Releases](https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest). **Do not use GitHub's Source code archives.**
+2. Copy the ZIP to the handheld, for example into `~/Downloads/`, using a USB drive. Keep the ZIP intact; do not extract it.
 3. Open Decky Settings → General and enable Developer mode.
 4. Open Developer → Install Plugin from ZIP File → Browse, select the local ZIP, and confirm Decky's installation prompts.
 5. Save work, reboot the handheld after installation, and check plugin status.
 
-This path does not run `install.sh`. The ZIP includes the prebuilt plugin and its required Python dependencies, so installation requires no network downloads. You can verify the files first in desktop-mode Konsole:
+This path does not run `install.sh`. The ZIP includes the prebuilt plugin and its required Python dependencies, so installation requires no network downloads.
+
+<details>
+<summary>Optional: verify the downloaded file</summary>
+
+Download `msi-claw-a8-controller-suite.zip.sha256` from the same release and put it alongside the ZIP. Run the following in desktop-mode Konsole to check for download or transfer corruption. Decky's local ZIP installer does not require this file.
+
 
 ```sh
 cd ~/Downloads
 sha256sum -c msi-claw-a8-controller-suite.zip.sha256
 ```
+
+</details>
 
 This is Decky's built-in local installation path; no separate package is needed. The in-plugin Repair plugin and controller and Clear configurations and reinstall actions still download a release over the network.
 

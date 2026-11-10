@@ -42,18 +42,26 @@ curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-su
 
 ### 离线安装
 
-1. 在有网的设备上，从 [Releases](https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest) 下载附件 `msi-claw-a8-controller-suite.zip` 和同名 `.zip.sha256` 校验文件，**不要下载 GitHub 的 Source code 压缩包**。
-2. 通过 U 盘等方式将文件拷到掌机，例如 `~/Downloads/`。保留 ZIP，不要解压。
+1. 在有网的设备上，从 [Releases](https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest) 下载附件 `msi-claw-a8-controller-suite.zip`，**不要下载 GitHub 的 Source code 压缩包**。
+2. 通过 U 盘等方式将 ZIP 拷到掌机，例如 `~/Downloads/`。保留 ZIP，不要解压。
 3. 打开 Decky 设置 → 通用，开启“开发者模式”。
 4. 进入“开发者”→“从 ZIP 压缩文件安装插件”→“浏览文件”，选择本地 ZIP，按 Decky 提示确认安装。
 5. 安装完成后保存工作、重启掌机，再打开插件检查状态。
 
-此安装路径不运行 `install.sh`，安装所需代码和 Python 依赖已在 ZIP 内，无需联网下载。可在桌面模式 Konsole 中先校验文件：
+此安装路径不运行 `install.sh`，安装所需代码和 Python 依赖已在 ZIP 内，无需联网下载。
+
+<details>
+<summary>可选：校验下载文件</summary>
+
+从同一版本的发布页额外下载 `msi-claw-a8-controller-suite.zip.sha256`，与 ZIP 放在同一目录。在桌面模式 Konsole 中运行以下命令，检查下载或传输是否损坏。Decky 本地安装不需要这个校验文件。
+
 
 ```sh
 cd ~/Downloads
 sha256sum -c msi-claw-a8-controller-suite.zip.sha256
 ```
+
+</details>
 
 这是 Decky 自带的本地安装入口，无需另一个安装包。插件内“修复插件与手柄”和“清除配置并重新安装”仍会联网下载发行包。
 
