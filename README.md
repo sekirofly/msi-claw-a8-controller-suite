@@ -28,7 +28,11 @@ Management is enabled on first install. Restore system defaults and disable retu
 
 ## Install and update
 
-Install Decky first. Disable DeckyPlumber and the separate back-button/rumble plugin to avoid competing writers. Run as your normal desktop user in SteamOS Konsole:
+**Prerequisites:** Install [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) and disable all other controller-management plugins, such as DeckyPlumber.
+
+### Online installation
+
+Run as your normal desktop user in SteamOS Konsole:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.3/install.sh | bash
@@ -36,9 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-su
 
 The installer verifies the release SHA-256 and restarts Decky. Updates retain mappings and management preference without resetting the controller. Save work, reboot the handheld and check plugin status. Installation completion does not confirm that mappings were applied. For a custom Decky home, use `bash -s -- install --decky-home /absolute/homebrew`.
 
-### Install a local ZIP through Decky (offline)
-
-Decky and InputPlumber must already be installed on the handheld. Disable DeckyPlumber and the separate back-button/rumble plugin first.
+### Offline installation
 
 1. On a connected device, download the `msi-claw-a8-controller-suite.zip` release asset and its `.zip.sha256` checksum from [Releases](https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest). **Do not use GitHub's Source code archives.**
 2. Copy the files to the handheld, for example into `~/Downloads/`, using a USB drive. Keep the ZIP intact; do not extract it.
