@@ -365,6 +365,10 @@ function QuickPanel() {
     </PanelSectionRow>
     {row(t('游戏：','Game: ')+gameText)}
     {s.managed&&rules&&['M2','M1'].map(key=>row(buttonLabel(key)+' → '+outputLabel(key)))}
+    {game&&game!==scope&&<PanelSectionRow><ButtonItem layout="below" disabled={c.busy}
+      onClick={()=>open(game,s.game_name)}>
+      {s.config.games[game]?t('编辑本游戏专用按键','Edit this game’s custom buttons'):t('为本游戏创建专用按键','Create custom buttons for this game')}
+    </ButtonItem></PanelSectionRow>}
   </PanelSection>}<RumblePanel c={c}/><PanelSection><PanelSectionRow><ButtonItem layout="below" onClick={()=>open()}>{t('打开设置','Open settings')}</ButtonItem></PanelSectionRow></PanelSection></>;
 }
 
@@ -416,7 +420,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.27 · GPL-3.0-only')}
+        {row('0.1.0-alpha.28 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem layout="below" disabled={c.busy} onClick={()=>confirm(
           action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装当前版本','Repair current version'),

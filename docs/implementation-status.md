@@ -1,5 +1,9 @@
 # Initial implementation status
 
+## Alpha.28: restore game-specific entry
+
+When the current game is not the applied scope, offer creation/editing of its custom configuration. The top action still edits the displayed scope. New configurations independently copy defaults; no game entry is shown without a reliable current game.
+
 ## Alpha.27: edit the displayed configuration from the top row
 
 Make Current buttons: configuration name the first native action, with plain status rows below and no separate Edit action. Clicking edits the displayed applied scope, including defaults during a running game. Component/type/build checks passed; Steam gamepad scrolling still needs hardware verification.
