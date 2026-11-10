@@ -161,8 +161,8 @@ class InstallerTests(unittest.TestCase):
 
     def test_install_update_preserves_configuration(self):
         # An update keeps the configuration, the snapshot and the management
-        # choice untouched: the new version re-applies from that snapshot
-        # instead of restoring first, so nothing in settings is rewritten.
+        # choice untouched. The legacy snapshot is retained as backup only;
+        # current mappings are compiled from installed system defaults.
         snapshot = self.active_snapshot()
         preference = snapshot.parent / 'management.json'
         preference.write_text('{"enabled":false}')

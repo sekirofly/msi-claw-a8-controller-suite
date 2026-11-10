@@ -61,10 +61,8 @@ function errorText(code?: string): string {
     interface_unavailable:['接口不可用，请查看诊断','Interface unavailable; check diagnostics'],
     yaml_missing:['需要系统 Python PyYAML','System Python PyYAML is required'],
     external_change:['手柄配置发生变化，请检查冲突后重试','Controller configuration changed. Check for conflicts and retry'],
-    management_disabled:['配置尚未应用，请重试','Configuration has not been applied. Retry'],
     stale_edit:['配置已被修改，请重新打开编辑页','Configuration changed; reopen the editor'],
     source_unavailable:['设备未报告该输入，未应用配置','Device does not report this input; configuration not applied'],
-    game_unknown:['当前游戏未确认，未切换配置','Current game is unknown; configuration was not switched'],
     rumble_unavailable:['内置手柄未提供可确认的震动测试接口','Verified embedded rumble test interface unavailable'],
     config_corrupt:['配置文件无法读取，未覆盖原文件','Configuration unreadable; original file was not overwritten'],
     test_busy:['测试进行中，请稍候','Test in progress; please wait'],
@@ -337,7 +335,7 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
         const r=await enqueue(()=>saveConfig(scope,name,rules,enabled,revision));
         setRevision(r.config.revision);setDirty(false);
         if(r.apply_error) throw new Error(t('已保存，未生效：','Saved, not applied: ')+errorText(r.apply_error));
-        setDirty(false);onClose();
+        onClose();
       })}>{scope==='default'?t('保存默认按键','Save default buttons'):t('保存到：','Save to: ')+title}</ButtonItem></PanelSectionRow>
       <PanelSectionRow><ButtonItem layout="below" disabled={c.busy} onClick={close}>{t('返回','Back')}</ButtonItem></PanelSectionRow>
     </PanelSection>
