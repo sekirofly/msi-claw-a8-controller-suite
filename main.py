@@ -44,6 +44,8 @@ class Plugin:
         self.started_at = time.strftime('%H:%M:%S')
         self.rumble_test = {'state': 'idle', 'code': '', 'detail': ''}
         self.call_log = collections.deque(maxlen=40)
+        self.trace_lock = threading.Lock()
+        self.last_trace_error = None
         self.maintaining = False
         self.stopping = asyncio.Event()
 
@@ -55,17 +57,34 @@ class Plugin:
             self.store, self.ip = store, ip
 
     def trace(self, label, detail):
-        """Record every callable entry so a bridge-level failure leaves evidence."""
+        """Bound disk logging; keep ordinary successful reads in memory only."""
         line = '%s %s %s' % (time.strftime('%H:%M:%S'), label, detail[:200])
-        self.call_log.append(line)
-        try:
-            path = Path(os.environ['DECKY_PLUGIN_SETTINGS_DIR']) / 'calls.log'
-            if path.exists() and path.stat().st_size > 64 * 1024:
-                path.unlink()
-            with path.open('a', encoding='utf-8') as stream:
-                stream.write(line + '\n')
-        except Exception:
-            pass
+        with self.trace_lock:
+            self.call_log.append(line)
+            if detail in ('start', 'cancelled') or (label == 'get_state' and detail == 'ok'):
+                return
+            if detail.startswith(('error ', 'raised ')):
+                error = (label, detail)
+                if self.last_trace_error == error:
+                    return
+                self.last_trace_error = error
+            else:
+                self.last_trace_error = None
+            try:
+                path = Path(os.environ['DECKY_PLUGIN_SETTINGS_DIR']) / 'calls.log'
+                data = (line + '\n').encode('utf-8')
+                if path.exists() and path.stat().st_size + len(data) > 64 * 1024:
+                    backup = path.with_suffix('.log.1')
+                    path.replace(backup)
+                    if backup.stat().st_size > 64 * 1024:
+                        with backup.open('rb') as stream:
+                            stream.seek(-64 * 1024, 2)
+                            tail = stream.read()
+                        backup.write_bytes(tail)
+                with path.open('ab') as stream:
+                    stream.write(data)
+            except Exception:
+                pass
 
     async def operation(self, fn, label='op'):
         def run():
@@ -95,8 +114,10 @@ class Plugin:
             return {'ok': True, 'data': fn()}
         except Exception as exc:
             code = str(exc) if isinstance(exc, SuiteError) else 'operation_failed'
-            self.last_error = describe(exc)
-            log.exception('Controller operation failed (%s)', code)
+            detail = describe(exc)
+            if self.last_error != detail:
+                log.exception('Controller operation failed (%s)', code)
+            self.last_error = detail
             return {'ok': False, 'error': code}
 
     def status(self):
@@ -105,7 +126,12 @@ class Plugin:
                  'managed': self.ip.enabled, 'last_error': self.last_error,
                  'pid': os.getpid(), 'started': self.started_at,
                  'rumble_test': dict(self.rumble_test), 'call_log': list(self.call_log)[-8:]}
-        for key, call in [('hardware', self.hardware.state), ('inputplumber', self.ip.status)]:
+        identity = None
+        def hardware_state():
+            nonlocal identity
+            identity = self.hardware.discover()
+            return self.hardware.state(identity)
+        for key, call in [('hardware', hardware_state), ('inputplumber', lambda: self.ip.status(identity))]:
             try:
                 state[key] = call()
             except Exception as exc:
@@ -119,7 +145,7 @@ class Plugin:
         except Exception:
             state['consistent'] = False
         try:
-            state['can_test'] = len(rumble.candidates(self.hardware, self.hardware.discover())) == 1
+            state['can_test'] = len(rumble.candidates(self.hardware, identity) if identity else []) == 1
         except Exception:
             state['can_test'] = False
         return state
@@ -152,8 +178,10 @@ class Plugin:
             if game_id is None:
                 self.game_known = False
                 return {'applied': self.applied, 'apply_error': self.apply_error}
+            changed = game_id != self.game
             self.game, self.game_name, self.game_known = game_id, name, True
-            self.apply_selected()
+            if changed:
+                self.apply_selected()
             return {'applied': self.applied, 'apply_error': self.apply_error}
         return await self.operation(update, 'report_game')
 
