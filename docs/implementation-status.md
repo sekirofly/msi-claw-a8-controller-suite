@@ -1,5 +1,9 @@
 # Initial implementation status
 
+## Alpha.27: edit the displayed configuration from the top row
+
+Make Current buttons: configuration name the first native action, with plain status rows below and no separate Edit action. Clicking edits the displayed applied scope, including defaults during a running game. Component/type/build checks passed; Steam gamepad scrolling still needs hardware verification.
+
 ## Alpha.26: context first, action after
 
 - Alpha.25 put the edit action above the status rows to keep the focus target near the top of the panel. That inverted the information hierarchy: what the controller is currently doing is context and must be read first.

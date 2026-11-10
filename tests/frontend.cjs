@@ -51,6 +51,13 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     const summary=summaryButtons()[0];
     assert.ok(summary,'summary participates in focus navigation');
     assert.equal(summaryButtons().length,1,'one summary action, not one per line');
+    let defaultEditor;
+    try{
+      await act(async()=>{summary.props.onClick();defaultEditor=create(factory().props.pages[0].content)});
+      assert.ok(defaultEditor.root.findAllByType('PanelSection').some(x=>x.props.title===(language==='zh-CN'?'正在编辑：默认按键':'Editing: Default buttons')),
+        'running game using defaults opens the displayed default configuration');
+    }finally{await act(async()=>defaultEditor?.unmount());}
+
     const panelText=JSON.stringify(rendered.toJSON());
     const infoLabel=language==='zh-CN'?'当前按键：':'Current buttons: ';
     assert.ok(panelText.indexOf(infoLabel)<panelText.indexOf('\u203a'),'context precedes the action on screen');
@@ -283,8 +290,8 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
       let fallback;
       try{
         await act(async()=>{fallback=create(factory().props.pages[0].content)});
-        assert.ok(fallback.root.findAllByType('PanelSection').some(x=>x.props.title===(zh?'正在编辑：默认按键':'Editing: Default buttons')));
-        assert.equal(fallback.root.findAllByType('ToggleField').length,0);
+        assert.ok(fallback.root.findAllByType('PanelSection').some(x=>x.props.title===(zh?'正在编辑：Same':'Editing: Same')));
+        assert.equal(fallback.root.findAllByType('ToggleField').length,1);
       }finally{await act(async()=>fallback?.unmount());}
     }finally{await act(async()=>unknown?.unmount());}
     state.game_known=true;
