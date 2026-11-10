@@ -1,107 +1,73 @@
 # MSI Claw A8 Controller Suite
 
-Alpha.33 reduces idle timers and disk writes with event-driven game tracking, compatibility-only checks and save-completion notifications. calls.log retains one rotated backup, about 128KiB combined. Actual power savings require hardware measurement.
+A Decky plugin for the embedded controller on **MSI Claw A8 (BZ2EM / MS-1T8K)**. **v0.1.0 is the first stable release.** Community software, not an MSI product; other Claw models are outside the supported scope.
 
-> Fresh installs default to enabled. Explicit disable persists across reboot until enabled again. Restoration means system defaults, not another plugin’s or an earlier custom configuration.
+[简体中文](README.zh-CN.md) · [Implementation status](docs/implementation-status.md)
 
-English | [简体中文](README.zh-CN.md)
+## Install and update
 
-A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / BZ2EM)**, combining the hardware controls from [MSI Claw A8 Back Buttons & Rumble](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble) with selected InputPlumber integration inspired by [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber).
-
-**Status: v0.1.0-alpha.33 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
-
-## Install / update the preview
-
-1. Disable or uninstall DeckyPlumber and the separate Back Buttons & Rumble plugin before enabling this suite. Removing them is not automated; two active controllers must not compete.
-2. In SteamOS Desktop Mode, open Konsole and run as your normal desktop user:
+Install Decky first. Disable DeckyPlumber and the separate back-button/rumble plugin to avoid competing writers. Run as your normal desktop user in SteamOS Konsole:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.33/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0/install.sh | bash
 ```
 
-3. **Save work and reboot before returning to Gaming Mode.** If vibration remains unavailable after reboot, an EC reset may help; follow [MSI's official EC reset guidance](https://www.msi.com/support/technical_details/HH_EC_Reset). EC reset is not required routinely and is never automated.
-4. Open the suite, inspect device status, and first test rumble at a modest strength. Management starts enabled and applies automatically once the embedded A8 is identified. Test a simple Right M1 mapping, then test **Restore system defaults and disable**. This choice persists across reboot; **Enable management** resumes automatic management.
+The installer verifies the release SHA-256 and restarts Decky. Updates retain mappings and management preference without resetting the controller. Save work, reboot the handheld and check plugin status. Installation completion does not confirm that mappings were applied. For a custom Decky home, use `bash -s -- install --decky-home /absolute/homebrew`.
 
-The installer checks the version-pinned ZIP and SHA-256 checksum, then briefly restarts Decky. It never restarts InputPlumber. A checksum detects corruption, not an independently signed release. Normal install/update retains configurations without restoring the controller first, then resumes the saved enabled/disabled choice. Keyboard and mouse are useful while testing controller configuration.
+## Use
 
-No system Python changes are needed: pure-Python PyYAML is bundled. Unknown board/USB topology or missing InputPlumber APIs disables the affected operation instead of guessing another controller. Read [preview limitations](docs/implementation-status.md).
+- Management defaults to enabled on first install; explicit disable persists across reboot. Enabled management uses Xbox Elite and only the verified embedded A8 controller.
+- Default mappings apply unless a game's independent custom configuration is enabled. Games are keyed by Steam ID; duplicate names display their IDs. Copying changes local edits; saving commits them.
+- Hardware back-button mode and left/right rumble strengths are shared across games. Sliders save automatically; the finite rumble test targets only the embedded controller.
+- Restore system defaults and disable uses the installed InputPlumber defaults, not historical custom settings from another plugin. Missing defaults produce an error.
 
-## Repair, clean reinstall, uninstall
+## Maintenance and removal
 
-Maintenance provides Repair plugin and controller, Clear configurations and reinstall, and Clean uninstall. The first two reset the internal controller and require a handheld reboot after Decky restarts. For a newer release, run that release's install command. Terminal alternatives:
+| Action | Mappings | Controller |
+| --- | --- | --- |
+| Repair plugin and controller | Retain | Reinstall files and software-reset the internal controller |
+| Clear configurations and reinstall | Delete default and all game configurations | Reinstall files and software-reset the controller |
+| Clean uninstall | Delete | Restore system defaults, then remove plugin |
+
+After confirming, wait for Decky to restart. The first two actions also require a **full handheld reboot**. Hardware mode and rumble strengths are not backed up/reapplied and may return to device defaults.
+
+Terminal alternatives (`reinstall` clears mappings but retains the management choice):
 
 ```sh
-# Clean reinstall: clear mappings, retain enabled/disabled choice, install again
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.33/install.sh | bash -s -- reinstall
-# Clean uninstall
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.33/install.sh | bash -s -- uninstall
-# Offline clean uninstall using installed code
+# Clear mappings, reinstall and reset controller; reboot afterward
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0/install.sh | bash -s -- reinstall --reset-controller
+# Uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0/install.sh | bash -s -- uninstall
+# Offline uninstall using installed files
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```
 
-Default Decky home is `~/homebrew`. For a different location append `-s -- install --decky-home /absolute/homebrew` after `bash` (use the requested action instead of `install`). Do not launch the default command as root; that would choose `/root/homebrew`.
+Failed uninstall restoration preserves the installation. `--skip-restore` explicitly bypasses restoration. Legacy recovery.json files are backups only, archived under `~/homebrew/.msi-claw-a8-controller-suite-recovery/` before clearing configuration.
 
-Ordinary terminal updates replace files and restart Decky while retaining configuration. Maintenance repair/reinstall additionally resets the internal controller without backing up/reapplying hardware settings. Terminal use requires an explicit `--reset-controller` flag for this reset. Clean reinstall clears mappings but retains the management choice. Neither restores the device first. Uninstall restores system defaults before removing files; failed restoration preserves the installation and reports the error. `--skip-restore` explicitly bypasses restoration.
+## Troubleshooting
 
-Defaults come from the installed `/usr/share/inputplumber/profiles/default.yaml` and `devices/50-msi_claw_a8_bz2e.yaml`. An existing `/usr/local/share/inputplumber` takes precedence, as upstream does. Third-party `/etc` overrides are not factory defaults. Missing or incompatible files stop device writes rather than guessing from a Steam display name; run `diagnostics.sh` for details. Old `recovery.json` files are retained only as legacy backups, archived under `~/homebrew/.msi-claw-a8-controller-suite-recovery/` before clean reinstall/uninstall. New installs create no snapshot.
-
-If a queued maintenance action does not complete, inspect:
+Inspect diagnostics and retry messages in Maintenance. For lost rumble, repair the plugin/controller and reboot. If ineffective, follow [MSI's EC reset instructions](https://www.msi.com/support/technical_details/HH_EC_Reset). Software controller reset is not established as equivalent to a full EC reset.
 
 ```sh
-journalctl -u msi-claw-a8-controller-suite-maintenance --no-pager -n 100
 sudo bash ~/homebrew/plugins/msi-claw-a8-controller-suite/diagnostics.sh
+journalctl -u msi-claw-a8-controller-suite-maintenance --no-pager -n 100
 ```
 
-## Planned scope
+Diagnostics are read-only and local. `game_tracking: events` means observed game changes; `compatibility-5s` checks frontend state every five seconds without backend calls/device writes when unchanged. calls.log plus one backup is bounded near 128KiB; successful state reads stay in memory. Decky/system logs follow host policies.
 
-- Keep the existing three hardware back-button modes and independent left/right rumble strength controls.
-- Uniquely identify the embedded A8 controller and its InputPlumber capabilities; never target Bluetooth or USB external controllers.
-- Use a fixed Xbox Elite output internally, with an A8-native button interface and no virtual-controller type selector.
-- Add Left M2 / Right M1 and other A8 button mappings, then optional per-game mapping profiles after recovery is validated.
-- Provide Simplified Chinese and English interfaces, diagnostics, and explicit restore controls.
+Installed defaults use profiles/default.yaml and devices/50-msi_claw_a8_bz2e.yaml under `/usr/local/share/inputplumber` when present, otherwise `/usr/share/inputplumber`. Third-party `/etc` overrides are not treated as defaults. Pure-Python PyYAML is bundled; system Python is not modified.
 
-The UI represents the actual A8 buttons, including Left M2 / Right M1. Steam may still identify an Xbox Elite with four paddles. First automatic activation snapshots the original configuration and establishes Elite output only for the verified embedded controller. The backend applies the suite state once at startup, and again only on an explicit change: a game switch, a saved configuration, the management toggle or a retry. It does not poll the device; opening the panel adds no writes and only reports drift. Per-game changes only update mappings.
-
-## Research and implementation plan
-
-The proposed integration design is ready for review: [简体中文设计草案](docs/design.zh-CN.md). The quick panel shows active mappings and shared rumble controls; infrequent hardware back-button modes move into device settings. Game-specific mappings start as independent copies of default mappings, with explicit editing scope and save actions. Copies are made from the default buttons or another game's saved configuration; the separate template library page was removed because it duplicated that path. Implementation has started; see [implementation status](docs/implementation-status.md).
-
-Confirmed: each game has at most one independent configuration, copied from the default buttons or another game's saved configuration. No live cross-game sharing and no template library. See the [pre-implementation integration review](docs/integration-review.zh-CN.md) for source-level conflicts, proposed scope boundaries and hardware checks still required.
-
-See [code research and capability matrix](docs/research.md), [中文调研与路线](docs/research.zh-CN.md), and [source provenance](THIRD_PARTY.md).
-
-First implementation milestone: port the proven hardware controls and add read-only device/capability discovery. Startup now reconciles the saved management choice for the embedded controller without restarting InputPlumber. Subsequent milestones require A8 testing of input, rumble, menu buttons and recovery paths.
-
-## Identity
-
-| Item | Value |
-| --- | --- |
-| Display name | MSI Claw A8 Controller Suite |
-| Repository / package and installation directory | `msi-claw-a8-controller-suite` |
-| Installation path | `~/homebrew/plugins/msi-claw-a8-controller-suite` |
-| Languages | Simplified Chinese and English |
-
-## License
-
-GPL-3.0-only for this project. This repository now includes a development implementation. Hardware controls derive from the existing MIT plugin, whose notice is retained in `third_party/hardware-controls-MIT.txt`. Any future code reuse must preserve upstream notices and applicable source-distribution obligations; see [THIRD_PARTY.md](THIRD_PARTY.md).
-
-## Development
-
-Node 22, pnpm 11.25.0 and Python 3.11+ are used in Linux CI:
+## Development and license
 
 ```sh
-python3 scripts/check_versions.py     # every version string must agree
-ruff check .                          # pyflakes-level Python checks
 pnpm install --frozen-lockfile
 pnpm run typecheck
 pnpm run build
 node --test tests/frontend.cjs
-python3 -m pip install PyYAML==6.0.3
 python3 -m unittest discover -s tests -v
+python3 scripts/check_versions.py
 ```
 
-Backend tests run on Python 3.11 and 3.13 in CI, because the handheld ships a newer interpreter than the development default. `check_versions.py` exists because the version appears in five places and three of them break installation when they drift: `installer.py` picks the release asset, `install.sh` pins the raw URL, and the panel only displays it.
+Packaging requires PyYAML 6.0.3: run scripts/package.py and scripts/verify_package.py. CI also checks Python 3.11/3.13, Ruff and shell syntax.
 
-Pure-Python PyYAML is bundled in the preview. The pip command above is for an isolated development environment, not SteamOS system Python. CI tests simulate controllers and do not validate actual A8 behavior.
-
-Terminal recovery is implemented in `recover.py`. On a manually provisioned development device, first stop this plugin's automatic callbacks, then invoke it with `sudo python3 /absolute/plugin/path/recover.py --settings-dir /absolute/DECKY_PLUGIN_SETTINGS_DIR`. Use the exact directory reported by Decky for this plugin, not a guessed slug. Recovery requires the installed default files, not a saved snapshot. Hardware back-button mode and rumble settings are not reset. Prefer the installer uninstall flow, which stops Decky before recovery. Legacy snapshots are not used by this version.
+GPL-3.0-only. Dependencies and original project attribution: [THIRD_PARTY.md](THIRD_PARTY.md). [Design](docs/design.zh-CN.md), [integration review](docs/integration-review.zh-CN.md) and [research](docs/research.md) remain historical references.

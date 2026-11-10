@@ -1,5 +1,7 @@
 # DeckyPlumber code research
 
+> Historical design/research reference. See the README for current behavior and installation.
+
 Historical research: the multi-target recommendations below are superseded by the [current design](design.zh-CN.md). The agreed product manages only the embedded A8 controller, uses fixed Xbox Elite output, and has no virtual-type selector.
 
 Reviewed 2026-11-07. Findings are source-code observations, not A8 hardware test results.

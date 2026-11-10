@@ -141,8 +141,8 @@ class InputPlumber:
                 'sources': [key for key, value in BUTTONS.items()
                             if 'Gamepad:Button:' + value in capabilities]}
 
-    def set_targets(self, path, values, confirm=True, timeout=10.0):
-        """Set the target set; confirm reads it back when the caller needs proof.
+    def set_targets(self, path, values, timeout=10.0):
+        """Set the target set and require confirmed readback.
 
         Calling SetTargetDevices makes InputPlumber tear down and rebuild every
         target object, so it is never called for a set that is already in place:
@@ -163,9 +163,7 @@ class InputPlumber:
             time.sleep(.1)
         actual = self.targets(path)
         log.warning('SetTargetDevices wanted %s, read back %s', wanted, actual)
-        if confirm:
-            raise SuiteError('readback_failed')
-        return False
+        raise SuiteError('readback_failed')
 
     def load(self, path, profile):
         self.bus.call(path, IFACE, 'LoadProfileFromYaml', 's', json.dumps(profile))
