@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {ButtonItem, PanelSection, PanelSectionRow, SliderField, ToggleField, DropdownItem,
-  ConfirmModal, DialogButton, showModal, Navigation, Router, SidebarNavigation, Focusable} from '@decky/ui';
+  ConfirmModal, DialogButton, ModalRoot, showModal, Navigation, Router, SidebarNavigation, Focusable} from '@decky/ui';
 import {callable, definePlugin, routerHook} from '@decky/api';
 
 const route = '/msi-claw-a8-controller-suite';
@@ -125,6 +125,29 @@ const row = (text: string) => <PanelSectionRow key={text}><div style={{fontSize:
 function confirm(title: string, description: string, action: () => void) {
   showModal(<ConfirmModal strTitle={title} strDescription={description} strOKButtonText={t('确认','Confirm')}
     strCancelButtonText={t('取消','Cancel')} onOK={action}/>);
+}
+
+// Steam's ConfirmModal focuses its first button, so a reflex A press would delete.
+// This variant puts Cancel first and focuses it: confirming needs a deliberate
+// move to the right.
+function DangerConfirm({title,description,confirmLabel,onConfirm,onCancel}:
+  {title:string;description:string;confirmLabel:string;onConfirm:()=>void;onCancel:()=>void}) {
+  return <ModalRoot active={true} onCancel={onCancel} bDestructiveWarning={true}>
+    <div style={{padding:'16px 20px', minWidth:460}}>
+      <div style={{fontSize:20,fontWeight:600}}>{title}</div>
+      <div style={{marginTop:8,fontSize:14,overflowWrap:'anywhere'}}>{description}</div>
+      <Focusable flow-children="row" preferredFocus style={{display:'flex',gap:12,marginTop:20}}>
+        <DialogButton onClick={onCancel} style={{flex:'1 1 0'}}>{t('取消','Cancel')}</DialogButton>
+        <DialogButton onClick={onConfirm} style={{flex:'1 1 0'}}>{confirmLabel}</DialogButton>
+      </Focusable>
+    </div>
+  </ModalRoot>;
+}
+function confirmDanger(title: string, description: string, action: () => void, confirmLabel = t('删除','Delete')) {
+  let handle: {Close: () => void} | undefined;
+  const close = () => handle?.Close();
+  handle = showModal(<DangerConfirm title={title} description={description} confirmLabel={confirmLabel}
+    onCancel={close} onConfirm={()=>{close();action();}}/>);
 }
 function Feedback({c,showDisabled=false}: {c: Controller; showDisabled?: boolean}) {
   const s=c.state;
@@ -305,6 +328,23 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
   </Focusable></FocusEntry>;
 }
 
+// Steam scrolls a newly focused element into view itself, across every scrollable
+// ancestor, and can stop a few pixels short, which clipped the first line under
+// the panel header. Align only the panel's own scroller instead: exactly one
+// container moves, the offset is computed rather than assumed, and focus is
+// never touched.
+function scrollParent(el: HTMLElement): HTMLElement | null {
+  let node = el.parentElement;
+  while (node && node.scrollHeight <= node.clientHeight + 1) node = node.parentElement;
+  return node;
+}
+function alignToTop(el: HTMLElement | null) {
+  if (!el) return;
+  const box = scrollParent(el);
+  if (!box) { el.scrollIntoView({block:'start',behavior:'auto'}); return; }
+  box.scrollTop += el.getBoundingClientRect().top - box.getBoundingClientRect().top - box.clientTop;
+}
+
 let requestedScope: {scope:string;name:string}|undefined;
 function QuickPanel() {
   const c=useController(); const s=c.state;
@@ -313,10 +353,10 @@ function QuickPanel() {
   useEffect(()=>()=>cancelAnimationFrame(frame.current),[]);
   function revealTop() {
     cancelAnimationFrame(frame.current);
-    // Run after Steam's focus scrolling, so it cannot leave the status above
-    // the viewport. Merely refreshing status must never move focus or scroll.
+    // Wait out Steam's own focus scrolling before correcting it. Merely
+    // refreshing status must never move focus or scroll.
     frame.current=requestAnimationFrame(()=>{
-      frame.current=requestAnimationFrame(()=>top.current?.scrollIntoView({block:'start',behavior:'auto'}));
+      frame.current=requestAnimationFrame(()=>alignToTop(top.current));
     });
   }
   const game=s?.game_known!==false&&reliableGame(s?.game)?s.game:undefined;
@@ -371,7 +411,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
       {Object.entries(s.config.games).map(([id,e])=><ConfigurationCard key={id} title={gameLabel(s,id)}
         description={e.enabled?t('专用按键已启用','Custom buttons enabled'):t('专用按键已停用，使用默认按键','Custom buttons disabled; uses default buttons')}
         restoreFocus={returnTo.current===id} onEdit={()=>openEditor({scope:id,name:e.name})}
-        onDelete={()=>confirm(t('删除专用配置？','Delete custom configuration?'),
+        onDelete={()=>confirmDanger(t('删除专用配置？','Delete custom configuration?'),
           gameLabel(s,id)+' · '+t('删除后使用默认按键。','Default buttons will be used after deletion.'),
           ()=>void c.run(()=>enqueue(()=>deleteConfig(id,s.config.revision))))}/>)}
     </>}
@@ -400,7 +440,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.20 · GPL-3.0-only')}
+        {row('0.1.0-alpha.21 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
           action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装当前版本','Repair current version'),

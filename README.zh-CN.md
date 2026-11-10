@@ -1,6 +1,6 @@
 # MSI Claw A8 Controller Suite
 
-Alpha.20 将顶部摘要与编辑入口合并成一个原生按钮卡片；复制操作移入弹窗，默认和游戏方案统一展示。同名游戏仅在必要时显示 ID 后缀，复制/保存/删除仍按原始 ID 操作。
+Alpha.21 让快速面板的状态块在获得焦点时完整露出：改为对齐面板自己的滚动容器，而不是调用 scrollIntoView（它会滚动所有祖先、还可能差几个像素）。删除游戏专用配置的弹窗现在默认聚焦“取消”，手快按 A 不会删除。CI 另外增加了五处版本号一致性检查、Python 静态检查，并在 3.11 与 3.13 上跑后端测试。
 
 > 首次安装默认启用；主动停用后跨重启保持停用，直到再次启用。恢复目标是系统默认，不是旧插件或用户此前的自定义配置。
 
@@ -8,7 +8,7 @@ Alpha.20 将顶部摘要与编辑入口合并成一个原生按钮卡片；复�
 
 面向 **MSI Claw A8（AMD Ryzen Z2 Extreme / BZ2EM）** 的综合 Decky 手柄管理插件项目。计划继承现有[背键与震动插件](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble)的硬件控制功能，结合 [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber) 的部分 InputPlumber 管理思路。
 
-**v0.1.0-alpha.20 为可安装预览版，供 A8 实机测试；不是稳定版，新增功能尚未经真机验证。** 现有小插件继续独立维护。第一阶段只针对 A8，不把 Claw 8 AI+ 等其他型号当作已兼容设备。本项目非 MSI 官方产品。
+**v0.1.0-alpha.21 为可安装预览版，供 A8 实机测试；不是稳定版，新增功能尚未经真机验证。** 现有小插件继续独立维护。第一阶段只针对 A8，不把 Claw 8 AI+ 等其他型号当作已兼容设备。本项目非 MSI 官方产品。
 
 ## 安装与更新
 
@@ -16,7 +16,7 @@ Alpha.20 将顶部摘要与编辑入口合并成一个原生按钮卡片；复�
 2. 在 SteamOS 桌面模式的 Konsole，以普通用户运行：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.20/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.21/install.sh | bash
 ```
 
 3. **安装后保存工作并重启，再回游戏模式。** 若重启后仍有震动消失，可按 [MSI 官方 EC 重置说明](https://www.msi.com/support/technical_details/HH_EC_Reset)恢复；不需要每次都做，插件不会自动重置。
@@ -32,9 +32,9 @@ curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-su
 
 ```sh
 # 干净重装，会清除本插件的按键配置
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.20/install.sh | bash -s -- reinstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.21/install.sh | bash -s -- reinstall
 # 干净卸载
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.20/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.21/install.sh | bash -s -- uninstall
 # 离线卸载
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```
@@ -75,5 +75,16 @@ sudo bash ~/homebrew/plugins/msi-claw-a8-controller-suite/diagnostics.sh
 第一个开发阶段是移植已验证的背键/震动功能，并加入只读设备探测。当前版本启动时会按保存的管理选择自动接管内置手柄，不自动重启 InputPlumber。后续阶段需在 A8 验证输入、震动、菜单键和恢复路径。
 
 显示名统一为 **MSI Claw A8 Controller Suite**；仓库、计划包名和安装目录标识统一为 `msi-claw-a8-controller-suite`；计划安装路径为 `~/homebrew/plugins/msi-claw-a8-controller-suite`。
+
+## 开发与 CI
+
+```sh
+python3 scripts/check_versions.py   # 五处版本号必须一致
+ruff check .                        # Python 静态检查（pyflakes 级别）
+python3 -m pip install PyYAML==6.0.3
+python3 -m unittest discover -s tests -v
+```
+
+后端测试在 CI 中同时跑 Python 3.11 与 3.13（掌机上的解释器比开发默认版本新）。`check_versions.py` 存在的原因是版本号出现在五个地方，其中三处一旦不一致会直接导致装不上：`installer.py` 决定下载哪个 release 资产，`install.sh` 钉死了 raw URL，面板里的那处只是显示。
 
 本项目采用 GPL-3.0-only。当前已有开发实现；硬件控制源自原 MIT 小插件，原许可保留在 `third_party/hardware-controls-MIT.txt`。后续复用代码时保留各上游许可和署名，详见 [THIRD_PARTY.md](THIRD_PARTY.md)。

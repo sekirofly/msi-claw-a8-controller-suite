@@ -2,9 +2,37 @@ name: Validate controller suite
 on: [push, pull_request]
 permissions:
   contents: read
+# A newer push supersedes an older run: stop the stale one instead of paying for
+# both and mailing two failures for the same mistake.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  check:
+  # Python checks run on two interpreters, but branch protection requires a check
+  # named exactly "check". A matrix job would report "check (3.11)" instead, so the
+  # matrix lives in its own job and "check" stays a single required status.
+  backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # SteamOS ships a newer interpreter than the development default, so the
+        # backend tests run on both rather than only where the author works.
+        python-version: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install PyYAML==6.0.3 ruff==0.17.4
+      - run: python scripts/check_versions.py
+      - run: ruff check .
+      - run: python -m unittest discover -s tests -v
+  check:
+    needs: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,7 +49,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck && pnpm run build
       - run: node --test tests/frontend.cjs
-      - run: python -m unittest discover -s tests -v
       - run: bash -n install.sh
       - run: bash -n diagnostics.sh
       - run: python scripts/package.py

@@ -1,5 +1,12 @@
 # Initial implementation status
 
+## Alpha.21: focus reveals the summary, deletion asks first
+
+- The quick panel aligns its status block with the panel's own scroll container instead of calling `scrollIntoView`. That call moves every scrollable ancestor and could stop a few pixels short, which clipped the first line under the header after scrolling down and back. The offset is computed (`scrollTop += wrapperTop - boxTop`), so the block is aligned wherever it sits and no assumption about being the first row is baked in; focus is never touched.
+- Deleting a per-game configuration opens a destructive dialog whose first, focused action is Cancel. Confirming needs a deliberate move to the right; B and Escape cancel. Non-destructive confirmations keep the native dialog.
+- CI now fails on a version mismatch between the five places, lints Python with pyflakes rules, runs backend tests on Python 3.11 and 3.13, cancels superseded runs on the same ref, and has job timeouts.
+- Native Steam gamepad navigation and the exact scroll offset still need hardware confirmation.
+
 ## Alpha.20: native action cards, copy dialog and duplicate names
 
 - Hardware feedback showed the plain text summary was still skipped by Steam navigation. Replace it with one native Decky DialogButton combining summary and editor entry, scrolling to the top on focus.

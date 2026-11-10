@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from backend.inputplumber import InputPlumber, IFACE
+from backend.inputplumber import InputPlumber
 from backend.inputplumber import Bus as PlumberBus
 from backend.config import SuiteError, BUTTONS
 
