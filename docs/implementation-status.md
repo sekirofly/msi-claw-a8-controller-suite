@@ -1,5 +1,9 @@
 # Initial implementation status
 
+## Alpha.30: precise editor labels and a text-like version anchor
+
+Restore explicit default/create-game/edit-game action labels. Keep native version navigation without button background, border or block highlight; focus is indicated by text underline only. Activation remains a no-op. Native Steam styling requires hardware confirmation.
+
 ## Alpha.29: restore a fixed quick-panel layout
 
 Use a native no-op version button at the top as a focus anchor, followed by plain status rows and one contextual Edit action. A reliable running game opens its custom configuration, otherwise defaults. Remove the extra game action and clickable scope label.

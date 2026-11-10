@@ -331,6 +331,7 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
 let requestedScope: {scope:string;name:string}|undefined;
 function QuickPanel() {
   const c=useController(); const s=c.state;
+  const [versionFocused,setVersionFocused]=useState(false);
   const game=s?.game_known!==false&&reliableGame(s?.game)?s.game:undefined;
   const scope=s?.applied;
   const rules=scope==='default'?s?.config.default:scope?s?.config.games[scope]?.rules:undefined;
@@ -354,14 +355,22 @@ function QuickPanel() {
     :t('无法识别，保持当前配置','Unrecognized; keeping current configuration');
   // A small native version control anchors navigation at the very top.
   return <><PanelSection><PanelSectionRow>
-    <ButtonItem layout="below" onClick={()=>{}}>{t('版本 ','Version ')+'0.1.0-alpha.29'}</ButtonItem>
+    <style>{`.suite-version-anchor,.suite-version-anchor:hover,.suite-version-anchor:focus,.suite-version-anchor:active{background:transparent!important;border:0!important;box-shadow:none!important;outline:none!important;}
+      .suite-version-anchor::before,.suite-version-anchor::after{background:transparent!important;box-shadow:none!important;border:0!important;outline:none!important;}`}</style>
+    <div onFocusCapture={()=>setVersionFocused(true)} onBlurCapture={()=>setVersionFocused(false)}>
+      <DialogButton className="suite-version-anchor" noFocusRing onClick={()=>{}}
+        onGamepadFocus={()=>setVersionFocused(true)} onGamepadBlur={()=>setVersionFocused(false)}
+        style={{width:'100%',textAlign:'left',padding:'4px 0',fontSize:13,textDecoration:versionFocused?'underline':'none'}}>
+        {t('版本 ','Version ')+'0.1.0-alpha.30'}
+      </DialogButton>
+    </div>
   </PanelSectionRow></PanelSection><Feedback c={c}/>{s&&<PanelSection>
     {row(t('当前按键：','Current buttons: ')+current)}
     {row(t('游戏：','Game: ')+gameText)}
     {s.managed&&rules&&['M2','M1'].map(key=>row(buttonLabel(key)+' → '+outputLabel(key)))}
     <PanelSectionRow><ButtonItem layout="below" disabled={c.busy}
       onClick={()=>open(game??'default',game?s.game_name:t('默认按键','Default buttons'))}>
-      {t('编辑按键 ›','Edit buttons ›')}
+      {game?(s.config.games[game]?t('编辑本游戏专用按键','Edit this game’s custom buttons'):t('为本游戏创建专用按键','Create custom buttons for this game')):t('编辑默认按键','Edit default buttons')}
     </ButtonItem></PanelSectionRow>
   </PanelSection>}<RumblePanel c={c}/><PanelSection><PanelSectionRow><ButtonItem layout="below" onClick={()=>open()}>{t('打开设置','Open settings')}</ButtonItem></PanelSectionRow></PanelSection></>;
 }
@@ -414,7 +423,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.29 · GPL-3.0-only')}
+        {row('0.1.0-alpha.30 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem layout="below" disabled={c.busy} onClick={()=>confirm(
           action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装当前版本','Repair current version'),
