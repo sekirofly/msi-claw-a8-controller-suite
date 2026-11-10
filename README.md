@@ -36,6 +36,25 @@ curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-su
 
 The installer verifies the release SHA-256 and restarts Decky. Updates retain mappings and management preference without resetting the controller. Save work, reboot the handheld and check plugin status. Installation completion does not confirm that mappings were applied. For a custom Decky home, use `bash -s -- install --decky-home /absolute/homebrew`.
 
+### Install a local ZIP through Decky (offline)
+
+Decky and InputPlumber must already be installed on the handheld. Disable DeckyPlumber and the separate back-button/rumble plugin first.
+
+1. On a connected device, download the `msi-claw-a8-controller-suite.zip` release asset and its `.zip.sha256` checksum from [Releases](https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest). **Do not use GitHub's Source code archives.**
+2. Copy the files to the handheld, for example into `~/Downloads/`, using a USB drive. Keep the ZIP intact; do not extract it.
+3. Open Decky Settings → General and enable Developer mode.
+4. Open Developer → Install Plugin from ZIP File → Browse, select the local ZIP, and confirm Decky's installation prompts.
+5. Save work, reboot the handheld after installation, and check plugin status.
+
+This path does not run `install.sh`. The ZIP includes the prebuilt plugin and its required Python dependencies, so installation requires no network downloads. You can verify the files first in desktop-mode Konsole:
+
+```sh
+cd ~/Downloads
+sha256sum -c msi-claw-a8-controller-suite.zip.sha256
+```
+
+This is Decky's built-in local installation path; no separate package is needed. The in-plugin Repair plugin and controller and Clear configurations and reinstall actions still download a release over the network.
+
 ## Maintenance and removal
 
 | Action | Mappings | Controller |
