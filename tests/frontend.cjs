@@ -46,11 +46,11 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     assert.match(json,language==='zh-CN'?/左 M2 → B/:/Left M2 → B/);
     assert.match(json,language==='zh-CN'?/右 M1 → 不输出/:/Right M1 → No output/);
     assert.doesNotMatch(json,/未运行游戏 \/ 尚未确认|基础映射 \/ 未确认/);
-    const summaryRow=()=>rendered.root.findAllByType('ButtonItem')
-      .find(x=>String(x.props.label??'').includes(language==='zh-CN'?'当前按键':'Current buttons'));
-    const summary=summaryRow();
+    // The summary action is the only button that ends with the chevron.
+    const summaryButtons=()=>rendered.root.findAllByType('ButtonItem').filter(x=>String(x.props.children).includes('›'));
+    const summary=summaryButtons()[0];
     assert.ok(summary,'summary participates in focus navigation');
-    assert.equal(rendered.root.findAllByType('ButtonItem').filter(x=>String(x.props.label??'').includes(language==='zh-CN'?'当前按键':'Current buttons')).length,1,'one summary row, not one per line');
+    assert.equal(summaryButtons().length,1,'one summary action, not one per line');
     assert.equal(summary.findAllByType('Focusable').length,0,'summary has no nested focus stops');
     const elementText=node=>typeof node==='string'?node:Array.isArray(node)?node.map(elementText).join(''):
       node&&node.props?elementText(node.props.children):'';
@@ -209,10 +209,10 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
   const plugin=mod.exports.default();let quick,nav,page;
   try{
     await act(async()=>{quick=create(plugin.content);nav=create(factory())});
-    const card=quick.root.findAllByType('ButtonItem').find(x=>String(x.props.label??'').includes(zh?'当前按键':'Current buttons'));
-    assert.match(String(card.props.label),/Same · ID 1/);
+    const card=quick.root.findAllByType('ButtonItem').find(x=>String(x.props.children).includes('›'));
+    assert.ok(JSON.stringify(quick.toJSON()).includes((zh?'当前按键：':'Current buttons: ')+'Same · ID 1'),'scope is plain information');
     assert.equal(card.findAllByType('Focusable').length,0);
-    assert.equal(quick.root.findAllByType('ButtonItem').filter(x=>String(x.props.label??'').includes(zh?'当前按键':'Current buttons')).length,1);
+    assert.equal(quick.root.findAllByType('ButtonItem').filter(x=>String(x.props.children).includes('›')).length,1);
     await act(async()=>{page=create(nav.root.findByType('SidebarNavigation').props.pages[0].content,
       {createNodeMock:e=>e.type==='Focusable'?{querySelector:()=>({focus:()=>focus.push('page')})}:null})});
     const section=label=>page.root.findAllByType('PanelSection').find(x=>x.props.title===label);
@@ -274,7 +274,7 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
     try{
       await act(async()=>{unknown=create(plugin.content)});
       const unknownCard=unknown.root.findAllByType('ButtonItem')
-        .find(x=>String(x.props.label??'').includes(zh?'当前按键':'Current buttons'));
+        .find(x=>String(x.props.children).includes('›'));
       assert.ok(JSON.stringify(unknown.toJSON()).includes(zh?'无法识别，保持当前配置':'Unrecognized; keeping current configuration'));
       await act(async()=>{unknownCard.props.onClick()});
       let fallback;
