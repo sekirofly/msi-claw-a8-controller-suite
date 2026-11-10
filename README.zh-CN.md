@@ -8,7 +8,7 @@ Alpha.26 让快速面板恢复自然的层级：先状态信息，后编辑动�
 
 面向 **MSI Claw A8（AMD Ryzen Z2 Extreme / BZ2EM）** 的综合 Decky 手柄管理插件项目。计划继承现有[背键与震动插件](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble)的硬件控制功能，结合 [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber) 的部分 InputPlumber 管理思路。
 
-**v0.1.0-alpha.29 为可安装预览版，供 A8 实机测试；不是稳定版，新增功能尚未经真机验证。** 现有小插件继续独立维护。第一阶段只针对 A8，不把 Claw 8 AI+ 等其他型号当作已兼容设备。本项目非 MSI 官方产品。
+**v0.1.0-alpha.30 为可安装预览版，供 A8 实机测试；不是稳定版，新增功能尚未经真机验证。** 现有小插件继续独立维护。第一阶段只针对 A8，不把 Claw 8 AI+ 等其他型号当作已兼容设备。本项目非 MSI 官方产品。
 
 ## 安装与更新
 
@@ -16,7 +16,7 @@ Alpha.26 让快速面板恢复自然的层级：先状态信息，后编辑动�
 2. 在 SteamOS 桌面模式的 Konsole，以普通用户运行：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.29/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.30/install.sh | bash
 ```
 
 3. **安装后保存工作并重启，再回游戏模式。** 若重启后仍有震动消失，可按 [MSI 官方 EC 重置说明](https://www.msi.com/support/technical_details/HH_EC_Reset)恢复；不需要每次都做，插件不会自动重置。
@@ -32,9 +32,9 @@ curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-su
 
 ```sh
 # 干净重装，会清除本插件的按键配置
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.29/install.sh | bash -s -- reinstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.30/install.sh | bash -s -- reinstall
 # 干净卸载
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.29/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.30/install.sh | bash -s -- uninstall
 # 离线卸载
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```

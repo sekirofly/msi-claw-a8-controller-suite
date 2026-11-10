@@ -47,19 +47,23 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     assert.match(json,language==='zh-CN'?/右 M1 → 不输出/:/Right M1 → No output/);
     assert.doesNotMatch(json,/未运行游戏 \/ 尚未确认|基础映射 \/ 未确认/);
     // The summary action is the only button that ends with the chevron.
-    const summaryButtons=()=>rendered.root.findAllByType('ButtonItem').filter(x=>String(x.props.children).includes('›'));
+    const summaryButtons=()=>rendered.root.findAllByType('ButtonItem').filter(x=>typeof x.props.children==='string'&&/编辑.*按键|创建专用按键|Edit .*buttons|Create custom buttons/.test(x.props.children));
     const summary=summaryButtons()[0];
-    const version=rendered.root.findAllByType('ButtonItem')[0];
-    assert.match(String(version.props.children),/0\.1\.0-alpha\.29/);
+    const version=rendered.root.findAllByType('DialogButton').find(x=>x.props.className==='suite-version-anchor');
+    assert.match(String(version.props.children),/0\.1\.0-alpha\.30/);
     const beforeVersion=calls.length;
     await act(async()=>{version.props.onClick()});
     assert.equal(calls.length,beforeVersion,'version focus anchor performs no operation');
+    assert.equal(version.props.noFocusRing,true);
+    await act(async()=>{version.props.onGamepadFocus()});
+    assert.equal(rendered.root.findAllByType('DialogButton').find(x=>x.props.className==='suite-version-anchor').props.style.textDecoration,'underline');
+    await act(async()=>{version.props.onGamepadBlur()});
 
     assert.ok(summary,'summary participates in focus navigation');
     assert.equal(summaryButtons().length,1,'one summary action, not one per line');
     const panelText=JSON.stringify(rendered.toJSON());
     const infoLabel=language==='zh-CN'?'当前按键：':'Current buttons: ';
-    assert.ok(panelText.indexOf(infoLabel)<panelText.indexOf('\u203a'),'context precedes the action on screen');
+    assert.ok(panelText.indexOf(infoLabel)<panelText.indexOf(language==='zh-CN'?'为本游戏创建专用按键':'Create custom buttons for this game'),'context precedes the action on screen');
     assert.equal(summary.findAllByType('Focusable').length,0,'summary has no nested focus stops');
     const elementText=node=>typeof node==='string'?node:Array.isArray(node)?node.map(elementText).join(''):
       node&&node.props?elementText(node.props.children):'';
@@ -82,6 +86,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
         await act(async()=>{preview=create(plugin.content)});
         const content=JSON.stringify(preview.toJSON());
         assert.ok(content.includes(scenario.expected));
+        assert.ok(content.includes(scenario.game==='1'?(language==='zh-CN'?'编辑本游戏专用按键':'Edit this game’s custom buttons'):(language==='zh-CN'?'编辑默认按键':'Edit default buttons')));
         if(scenario.game==='default')assert.ok(content.includes(language==='zh-CN'?'游戏：未运行':'Game: Not running'));
         if(scenario.game==='1')assert.ok(content.includes(language==='zh-CN'?'游戏：Game One':'Game: Game One'));
         if(!scenario.applied)assert.doesNotMatch(content,/→/);
@@ -218,10 +223,10 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
   const plugin=mod.exports.default();let quick,nav,page;
   try{
     await act(async()=>{quick=create(plugin.content);nav=create(factory())});
-    const card=quick.root.findAllByType('ButtonItem').find(x=>String(x.props.children).includes('›'));
+    const card=quick.root.findAllByType('ButtonItem').find(x=>typeof x.props.children==='string'&&/编辑.*按键|创建专用按键|Edit .*buttons|Create custom buttons/.test(x.props.children));
     assert.ok(JSON.stringify(quick.toJSON()).includes((zh?'当前按键：':'Current buttons: ')+'Same · ID 1'),'scope is plain information');
     assert.equal(card.findAllByType('Focusable').length,0);
-    assert.equal(quick.root.findAllByType('ButtonItem').filter(x=>String(x.props.children).includes('›')).length,1);
+    assert.equal(quick.root.findAllByType('ButtonItem').filter(x=>typeof x.props.children==='string'&&/编辑.*按键|创建专用按键|Edit .*buttons|Create custom buttons/.test(x.props.children)).length,1);
     await act(async()=>{page=create(nav.root.findByType('SidebarNavigation').props.pages[0].content,
       {createNodeMock:e=>e.type==='Focusable'?{querySelector:()=>({focus:()=>focus.push('page')})}:null})});
     const section=label=>page.root.findAllByType('PanelSection').find(x=>x.props.title===label);
@@ -283,7 +288,7 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
     try{
       await act(async()=>{unknown=create(plugin.content)});
       const unknownCard=unknown.root.findAllByType('ButtonItem')
-        .find(x=>String(x.props.children).includes('›'));
+        .find(x=>typeof x.props.children==='string'&&/编辑.*按键|创建专用按键|Edit .*buttons|Create custom buttons/.test(x.props.children));
       assert.ok(JSON.stringify(unknown.toJSON()).includes(zh?'无法识别，保持当前配置':'Unrecognized; keeping current configuration'));
       await act(async()=>{unknownCard.props.onClick()});
       let fallback;
