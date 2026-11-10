@@ -159,7 +159,7 @@ function Feedback({c,showDisabled=false}: {c: Controller; showDisabled?: boolean
     {disabled&&row(t('管理已停用；修改可保存，启用后生效。','Management disabled; edits can be saved and apply when enabled.'))}
     {s?.apply_error && <>
       {row((s.managed?t('尚未生效：','Not applied: '):t('系统默认尚未恢复：','System defaults not yet restored: '))+errorText(s.apply_error))}
-      <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>void c.run(()=>enqueue(()=>manage(s.managed)))}>{t('重试','Retry')}</ButtonItem></PanelSectionRow>
+      <PanelSectionRow><ButtonItem layout="below" disabled={c.busy} onClick={()=>void c.run(()=>enqueue(()=>manage(s.managed)))}>{t('重试','Retry')}</ButtonItem></PanelSectionRow>
     </>}
     {s?.hardware_error&&row(errorText(s.hardware_error))}
   </PanelSection>;
@@ -299,7 +299,7 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
         onChange={v=>{setEnabled(v);setDirty(true);}}/></PanelSectionRow>}
     </PanelSection>
     <PanelSection>
-      <FocusEntry active={copyReturn>0} revision={copyReturn}><PanelSectionRow><ButtonItem disabled={c.busy||!choices.length}
+      <FocusEntry active={copyReturn>0} revision={copyReturn}><PanelSectionRow><ButtonItem layout="below" disabled={c.busy||!choices.length}
         description={!choices.length?t('暂无其他可复制的方案','No other configurations to copy'):undefined}
         onClick={openCopy}>{t('从其他方案复制…','Copy from another configuration…')}</ButtonItem></PanelSectionRow></FocusEntry>
     </PanelSection>
@@ -317,13 +317,13 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
       {row(t('Guide/QAM 入口受保护。摇杆和扳机轴保持原始行为。','Guide/QAM are protected. Stick and trigger axes keep their original behavior.'))}
     </PanelSection>
     <PanelSection>
-      <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>void c.run(async()=>{
+      <PanelSectionRow><ButtonItem layout="below" disabled={c.busy} onClick={()=>void c.run(async()=>{
         const r=await enqueue(()=>saveConfig(scope,name,rules,enabled,revision));
         setRevision(r.config.revision);setDirty(false);
         if(r.apply_error) throw new Error(t('已保存，未生效：','Saved, not applied: ')+errorText(r.apply_error));
         setDirty(false);onClose();
       })}>{scope==='default'?t('保存默认按键','Save default buttons'):t('保存到：','Save to: ')+title}</ButtonItem></PanelSectionRow>
-      <PanelSectionRow><ButtonItem disabled={c.busy} onClick={close}>{t('返回','Back')}</ButtonItem></PanelSectionRow>
+      <PanelSectionRow><ButtonItem layout="below" disabled={c.busy} onClick={close}>{t('返回','Back')}</ButtonItem></PanelSectionRow>
     </PanelSection>
   </Focusable></FocusEntry>;
 }
@@ -381,7 +381,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
       <ConfigurationCard title={t('默认按键','Default buttons')} description={t('未启用游戏专用方案时使用','Used when no game-specific configuration is enabled')}
         restoreFocus={returnTo.current==='default'} onEdit={()=>openEditor({scope:'default',name:t('默认按键','Default buttons')})}/>
       {s.game_known!==false&&reliableGame(s.game)&&!s.config.games[s.game]&&<PanelSection>
-        <FocusEntry active={returnTo.current===s.game}><PanelSectionRow><ButtonItem onClick={()=>openEditor({scope:s.game!,name:s.game_name})}>
+        <FocusEntry active={returnTo.current===s.game}><PanelSectionRow><ButtonItem layout="below" onClick={()=>openEditor({scope:s.game!,name:s.game_name})}>
           {t('为当前游戏创建：','Create for current game: ')+gameLabel(s,s.game,s.game_name)}</ButtonItem></PanelSectionRow></FocusEntry>
       </PanelSection>}
       {Object.entries(s.config.games).map(([id,e])=><ConfigurationCard key={id} title={gameLabel(s,id)}
@@ -394,7 +394,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
     {page==='hardware'&&<>
       <PanelSection>{row(t('本页设置对所有游戏生效','Settings on this page apply to all games'))}</PanelSection>
       <PanelSection title={t('背键硬件模式','Back-button hardware mode')}>
-        {MODES.map(mode=><PanelSectionRow key={mode.key}><ButtonItem disabled={c.busy||!s.hardware}
+        {MODES.map(mode=><PanelSectionRow key={mode.key}><ButtonItem layout="below" disabled={c.busy||!s.hardware}
           onClick={()=>void c.run(()=>enqueue(()=>setHardware(mode.key,null,null)))}>{s.hardware?.mode===mode.key?'● ':'○ '}{t(mode.zh,mode.en)}</ButtonItem></PanelSectionRow>)}
         {row(t('两个背键共用一个模式，点选立即写入硬件；不改变按键映射，也不会自动更改。','Both back buttons share one mode. Selecting writes it immediately; button mappings are unchanged and it is never set automatically.'))}
       </PanelSection>
@@ -408,7 +408,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         {row(t('仅管理 A8 内置手柄，不影响外接手柄。','Only the embedded A8 controller is managed; external controllers are unaffected.'))}
         {s.inputplumber_error&&row(errorText(s.inputplumber_error))}
         {s.managed&&s.consistent===false&&row(t('检测到手柄的实际输出与套件期望不一致（可能被外部重置）。点“重试”重新应用，不会自动改写。','The controller output differs from what this suite expects, possibly after an external reset. Use Retry to re-apply; nothing is rewritten automatically.'))}
-        <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>{
+        <PanelSectionRow><ButtonItem layout="below" disabled={c.busy} onClick={()=>{
           if(!s.managed){void c.run(()=>enqueue(()=>manage(true)));return;}
           confirm(t('恢复系统默认并停用管理？','Restore system defaults and disable management?'),
             t('内置手柄的输出和按键映射将恢复为本机系统默认，不恢复旧插件的自定义配置。此后保持停用，直到再次启用。背键硬件模式和震动不变。','Restore the installed system defaults, not another plugin’s custom configuration. Management stays disabled until you enable it again. Hardware back-button mode and rumble stay unchanged.'),
@@ -416,9 +416,9 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.23 · GPL-3.0-only')}
+        {row('0.1.0-alpha.24 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
-        {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
+        {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem layout="below" disabled={c.busy} onClick={()=>confirm(
           action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装当前版本','Repair current version'),
           t('将短暂重启 Decky。修复保留配置；重装清除按键配置并保留启用选择；卸载先恢复系统默认。硬件震动与背键模式不重置。卸载恢复失败时保留文件。','Decky restarts briefly. Repair keeps settings; reinstall clears mappings and keeps the management choice; uninstall restores system defaults first. Hardware settings stay unchanged. Failed uninstall restoration preserves files.'),
           ()=>void c.run(()=>enqueue(()=>maintenance(action))))}>
@@ -426,7 +426,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         </ButtonItem></PanelSectionRow>)}
       </PanelSection>
       <PanelSection title={t('诊断信息','Diagnostics')}>
-        <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>void c.run(async()=>{})}>{t('刷新诊断','Refresh diagnostics')}</ButtonItem></PanelSectionRow>
+        <PanelSectionRow><ButtonItem layout="below" disabled={c.busy} onClick={()=>void c.run(async()=>{})}>{t('刷新诊断','Refresh diagnostics')}</ButtonItem></PanelSectionRow>
         {s.last_error&&row(t('最近的后端错误：','Last backend error: ')+s.last_error)}
         {row(JSON.stringify({pid:s.pid, started:s.started, managed:s.managed, consistent:s.consistent, hardware:s.hardware, hardware_error:s.hardware_error, inputplumber:s.inputplumber, inputplumber_error:s.inputplumber_error, can_test:s.can_test, rumble_test:s.rumble_test, last_error:s.last_error, call_log:s.call_log},null,2))}
       </PanelSection>

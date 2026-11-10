@@ -1,5 +1,11 @@
 # Initial implementation status
 
+## Alpha.24: every action button the same shape
+
+- Action buttons are ``ButtonItem`` elements whose text is their only child. Without ``layout="below"`` that child lands in the trailing field, so each button drew a box sized to its own label: the three hardware modes and the maintenance actions looked ragged.
+- All of them now use ``layout="below"``, matching the rumble test: full row width, centred text, identical height and padding.
+- The quick-panel summary keeps the inline label/trailing form because it is a settings row, not an action button.
+
 ## Alpha.23: one component family on the quick panel
 
 - The summary is a standard settings row (``ButtonItem`` with a label and a trailing action) instead of a ``DialogButton``, which is the dialog-button primitive and carries different height, padding and background. Mixing the two families is what made the first row look foreign next to the rumble rows.
