@@ -1,0 +1,9 @@
+# Pyflakes-level checks only: undefined names, unused imports, syntax errors,
+# duplicate keys. Formatting and one-line `if x: return` statements are an
+# existing style choice here, so E4/E5/E7 stay off.
+target-version = "py311"
+line-length = 120
+extend-exclude = ["node_modules", "dist", "release", "py_modules", "third_party", "build"]
+
+[lint]
+select = ["F", "E9"]

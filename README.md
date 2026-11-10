@@ -90,6 +90,8 @@ GPL-3.0-only for this project. This repository now includes a development implem
 Node 22, pnpm 11.25.0 and Python 3.11+ are used in Linux CI:
 
 ```sh
+python3 scripts/check_versions.py     # every version string must agree
+ruff check .                          # pyflakes-level Python checks
 pnpm install --frozen-lockfile
 pnpm run typecheck
 pnpm run build
@@ -97,6 +99,8 @@ node --test tests/frontend.cjs
 python3 -m pip install PyYAML==6.0.3
 python3 -m unittest discover -s tests -v
 ```
+
+Backend tests run on Python 3.11 and 3.13 in CI, because the handheld ships a newer interpreter than the development default. `check_versions.py` exists because the version appears in five places and three of them break installation when they drift: `installer.py` picks the release asset, `install.sh` pins the raw URL, and the panel only displays it.
 
 Pure-Python PyYAML is bundled in the preview. The pip command above is for an isolated development environment, not SteamOS system Python. CI tests simulate controllers and do not validate actual A8 behavior.
 

@@ -76,4 +76,15 @@ sudo bash ~/homebrew/plugins/msi-claw-a8-controller-suite/diagnostics.sh
 
 显示名统一为 **MSI Claw A8 Controller Suite**；仓库、计划包名和安装目录标识统一为 `msi-claw-a8-controller-suite`；计划安装路径为 `~/homebrew/plugins/msi-claw-a8-controller-suite`。
 
+## 开发与 CI
+
+```sh
+python3 scripts/check_versions.py   # 五处版本号必须一致
+ruff check .                        # Python 静态检查（pyflakes 级别）
+python3 -m pip install PyYAML==6.0.3
+python3 -m unittest discover -s tests -v
+```
+
+后端测试在 CI 中同时跑 Python 3.11 与 3.13（掌机上的解释器比开发默认版本新）。`check_versions.py` 存在的原因是版本号出现在五个地方，其中三处一旦不一致会直接导致装不上：`installer.py` 决定下载哪个 release 资产，`install.sh` 钉死了 raw URL，面板里的那处只是显示。
+
 本项目采用 GPL-3.0-only。当前已有开发实现；硬件控制源自原 MIT 小插件，原许可保留在 `third_party/hardware-controls-MIT.txt`。后续复用代码时保留各上游许可和署名，详见 [THIRD_PARTY.md](THIRD_PARTY.md)。

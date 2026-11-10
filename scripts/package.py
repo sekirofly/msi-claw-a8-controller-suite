@@ -12,7 +12,7 @@ archive = output / 'msi-claw-a8-controller-suite.zip'
 prefix = 'msi-claw-a8-controller-suite/'
 with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as bundle:
     for name in ('main.py','recover.py','installer.py','install.sh','diagnostics.sh','maintenance_runner.py','plugin.json','package.json','pnpm-lock.yaml',
-                 'rollup.config.js','tsconfig.json','LICENSE','README.md','README.zh-CN.md',
+                 'rollup.config.js','tsconfig.json','.ruff.toml','LICENSE','README.md','README.zh-CN.md',
                  'THIRD_PARTY.md','implementation-status.zh-CN.md','dist/index.js'):
         bundle.write(root / name, prefix + name)
     for folder in ('src','backend','docs','tests','scripts','third_party'):
