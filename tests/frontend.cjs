@@ -89,7 +89,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
         const content=JSON.stringify(preview.toJSON());
         assert.ok(content.includes(scenario.expected));
         assert.ok(content.includes(scenario.game==='1'?(language==='zh-CN'?'编辑本游戏专用按键':'Edit this game’s custom buttons'):(language==='zh-CN'?'编辑默认按键':'Edit default buttons')));
-        if(scenario.game==='default')assert.ok(content.includes(language==='zh-CN'?'游戏：未运行':'Game: Not running'));
+        if(scenario.game==='default')assert.ok(content.includes(language==='zh-CN'?'游戏：当前无游戏运行':'Game: No game running'));
         if(scenario.game==='1')assert.ok(content.includes(language==='zh-CN'?'游戏：Game One':'Game: Game One'));
         if(!scenario.applied)assert.doesNotMatch(content,/→/);
         if(scenario.applied==='1')assert.ok(content.includes(language==='zh-CN'?'左 M2 → 右 M1':'Left M2 → Right M1'));
