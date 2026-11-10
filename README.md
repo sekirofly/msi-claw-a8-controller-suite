@@ -8,9 +8,13 @@ A Decky plugin for the embedded controller on **MSI Claw A8 (BZ2EM / MS-1T8K)**.
 
 Simulated previews rendered from the plugin's UI components with sample data. Steam's native appearance may differ.
 
-| Button mappings | Controller settings | Maintenance & About |
-| --- | --- | --- |
-| ![Button mapping editor](docs/assets/ui/en-mappings.png) | ![Back-button modes and rumble controls](docs/assets/ui/en-hardware.png) | ![Plugin management and controller repair](docs/assets/ui/en-maintenance.png) |
+| Home (quick panel) | Button mappings |
+| --- | --- |
+| ![Plugin home: current game, mappings and rumble controls](docs/assets/ui/en-home.png) | ![Button mapping editor](docs/assets/ui/en-mappings.png) |
+
+| Controller settings | Maintenance & About |
+| --- | --- |
+| ![Back-button modes and rumble controls](docs/assets/ui/en-hardware.png) | ![Plugin management and controller repair](docs/assets/ui/en-maintenance.png) |
 
 ## Features
 

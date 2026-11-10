@@ -8,9 +8,13 @@ MSI Claw A8（BZ2EM / MS-1T8K）内置手柄的 Decky 插件。本项目非 MSI 
 
 以下为使用插件实际界面组件和示例数据生成的模拟预览，Steam 原生外观可能略有不同。
 
-| 按键映射 | 手柄设置 | 维护与关于 |
-| --- | --- | --- |
-| ![按键映射编辑器](docs/assets/ui/zh-mappings.png) | ![背键模式与震动设置](docs/assets/ui/zh-hardware.png) | ![插件管理与手柄修复](docs/assets/ui/zh-maintenance.png) |
+| 主页（快捷面板） | 按键映射 |
+| --- | --- |
+| ![插件主页：当前游戏、按键方案与震动控制](docs/assets/ui/zh-home.png) | ![按键映射编辑器](docs/assets/ui/zh-mappings.png) |
+
+| 手柄设置 | 维护与关于 |
+| --- | --- |
+| ![背键模式与震动设置](docs/assets/ui/zh-hardware.png) | ![插件管理与手柄修复](docs/assets/ui/zh-maintenance.png) |
 
 ## 功能
 
