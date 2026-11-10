@@ -411,8 +411,9 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
           ()=>void c.run(()=>enqueue(()=>deleteConfig(id,s.config.revision))))}/>)}
     </>}
     {page==='hardware'&&<>
-      <PanelSection>{row(t('本页设置对所有游戏生效。SteamOS 下通常保持 Macro 即可。','Settings on this page apply to all games. On SteamOS, normally keep Macro selected.'))}</PanelSection>
+      <PanelSection>{row(t('本页设置对所有游戏生效。','Settings on this page apply to all games.'))}</PanelSection>
       <PanelSection title={t('背键硬件模式','Back-button hardware mode')}>
+        {row(t('SteamOS 下通常保持 Macro 即可。','On SteamOS, normally keep Macro selected.'))}
         {MODES.map(mode=><PanelSectionRow key={mode.key}><ButtonItem layout="below" description={t(mode.detailZh,mode.detailEn)} disabled={c.busy||!s.hardware}
           onClick={()=>void c.run(()=>enqueue(()=>setHardware(mode.key,null,null)))}>{s.hardware?.mode===mode.key?'● ':'○ '}{t(mode.zh,mode.en)}</ButtonItem></PanelSectionRow>)}
         {row(t('两个背键共用一个模式，点选立即写入硬件；不改变按键映射，也不会自动更改。','Both back buttons share one mode. Selecting writes it immediately; button mappings are unchanged and it is never set automatically.'))}
@@ -420,6 +421,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
       <RumblePanel c={c} shared={false}/>
     </>}
     {page==='about'&&<>
+      <PanelSection>{row('0.1.3 · GPL-3.0-only')}</PanelSection>
       <PanelSection title={t('插件管理','Plugin management')}>
         {row(s.managed
           ? t('管理已启用 · Xbox Elite','Management enabled · Xbox Elite')
@@ -435,7 +437,6 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.2 · GPL-3.0-only')}
         {row(t('震动消失时，先用“修复插件与手柄”软件重置手柄，再重启掌机；若仍未恢复，再参考 MSI 官方说明手动重置 EC。','If rumble stops working, use Repair plugin and controller to reset the controller, then reboot the handheld. If the issue persists, follow MSI’s official instructions for a manual EC reset.'))}
         {maintenancePending&&row(t('正在维护，请等待 Decky 自动重启，暂时不要操作。','Maintenance in progress. Wait for Decky to restart; avoid operating the plugin.'))}
         {maintenanceError&&row(maintenanceError)}
