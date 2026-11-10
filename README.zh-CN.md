@@ -1,8 +1,26 @@
 # MSI Claw A8 Controller Suite
 
-MSI Claw A8（BZ2EM / MS-1T8K）内置手柄的 Decky 插件。**v0.1.0 为首个正式版本。** 本项目非 MSI 官方产品，不支持将其他 Claw 型号视为已兼容设备。
+MSI Claw A8（BZ2EM / MS-1T8K）内置手柄的 Decky 插件。本项目非 MSI 官方产品，不支持将其他 Claw 型号视为已兼容设备。
 
-[English](README.md) · [实现状态](implementation-status.zh-CN.md)
+[English](README.md) · [实现状态](docs/implementation-status.md)
+
+## 界面预览
+
+以下为使用插件实际界面组件和示例数据生成的模拟预览，Steam 原生外观可能略有不同。
+
+| 按键映射 | 手柄设置 | 维护与关于 |
+| --- | --- | --- |
+| ![按键映射编辑器](docs/assets/ui/zh-mappings.png) | ![背键模式与震动设置](docs/assets/ui/zh-hardware.png) | ![插件管理与手柄修复](docs/assets/ui/zh-maintenance.png) |
+
+## 功能
+
+- **按键映射：**将内置手柄按键（包括左 M2、右 M1）映射为手柄按键、键盘按键或鼠标按键。
+- **默认与游戏专用方案：**设置通用的默认按键，为不同游戏创建专用方案，并在方案之间复制映射。
+- **震动调整与测试：**分别调整左右震动强度，并向内置手柄发送短暂震动进行测试。调整自动保存，对所有游戏生效。
+- **背键硬件模式：**提供 Macro、Combination、Disabled 三种模式的切换入口。SteamOS 推荐使用 Macro；Combination 用于 Windows 下的背键组合快捷操作。
+- **震动修复：**通过“修复插件与手柄”保留按键方案、重新安装插件并软件重置内置手柄，再重启掌机完成恢复。
+
+首次安装默认启用管理。选择“恢复系统默认并停用”后，内置手柄恢复系统默认配置，管理保持停用，直到再次启用。外接手柄不受影响。
 
 ## 安装与更新
 
@@ -13,13 +31,6 @@ curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-su
 ```
 
 安装器校验发行包 SHA-256 并重启 Decky。覆盖更新保留按键方案和管理选择，不自动重置手柄。保存工作并重启掌机后检查插件状态；安装成功不等于配置已应用。自定义 Decky 目录使用 `bash -s -- install --decky-home /绝对路径/homebrew`。
-
-## 使用
-
-- 首次安装默认启用管理；主动停用后跨重启保持停用。启用时固定 Xbox Elite 输出，只操作已确认的内置 A8 手柄。
-- 默认按键供未启用专用方案的游戏使用；每个游戏最多一份独立方案。游戏按 Steam ID 区分，重名时显示 ID。复制只修改编辑内容，保存后生效。
-- 手柄设置中的背键硬件模式和左右震动强度对所有游戏共用。震动滑块自动保存；测试仅触发内置手柄约半秒。
-- “恢复系统默认并停用”使用本机 InputPlumber 安装的默认配置，不恢复旧插件的历史自定义设置。缺少默认配置时明确报错。
 
 ## 维护与卸载
 
@@ -71,3 +82,12 @@ python3 scripts/check_versions.py
 打包需要 PyYAML 6.0.3：运行 `python3 scripts/package.py` 和 `python3 scripts/verify_package.py`。CI 另检查 Python 3.11/3.13、Ruff 和 Shell 语法。
 
 GPL-3.0-only；依赖及原项目来源见 [THIRD_PARTY.md](THIRD_PARTY.md)。[历史设计](docs/design.zh-CN.md)、[整合评审](docs/integration-review.zh-CN.md)与[研究记录](docs/research.zh-CN.md)仅作追溯。
+
+## 致谢
+
+- 感谢 aarron-lee 及贡献者维护的 [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber)，为本项目提供架构与 InputPlumber API 用法参考。
+- 感谢 [InputPlumber](https://github.com/ShadowBlip/InputPlumber) 提供手柄输入处理与虚拟设备支持。
+- 感谢 [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 提供插件平台与 Steam 界面集成。
+- 本项目的硬件控制实现基于 [MSI Claw A8 Back Buttons & Rumble](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble)。
+
+来源、复用范围和许可声明见 [THIRD_PARTY.md](THIRD_PARTY.md) 与 [third_party/](third_party/)。

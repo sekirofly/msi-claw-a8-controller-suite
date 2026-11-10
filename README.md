@@ -1,8 +1,26 @@
 # MSI Claw A8 Controller Suite
 
-A Decky plugin for the embedded controller on **MSI Claw A8 (BZ2EM / MS-1T8K)**. **v0.1.0 is the first stable release.** Community software, not an MSI product; other Claw models are outside the supported scope.
+A Decky plugin for the embedded controller on **MSI Claw A8 (BZ2EM / MS-1T8K)**. Community software, not an MSI product; other Claw models are outside the supported scope.
 
 [简体中文](README.zh-CN.md) · [Implementation status](docs/implementation-status.md)
+
+## Interface preview
+
+Simulated previews rendered from the plugin's UI components with sample data. Steam's native appearance may differ.
+
+| Button mappings | Controller settings | Maintenance & About |
+| --- | --- | --- |
+| ![Button mapping editor](docs/assets/ui/en-mappings.png) | ![Back-button modes and rumble controls](docs/assets/ui/en-hardware.png) | ![Plugin management and controller repair](docs/assets/ui/en-maintenance.png) |
+
+## Features
+
+- **Button remapping:** remap the built-in controller's buttons, including Left M2 and Right M1, to controller buttons, keyboard keys or mouse buttons.
+- **Default and per-game configurations:** keep a shared default layout, create custom layouts for individual games, and copy mappings between configurations.
+- **Rumble adjustment and testing:** adjust left and right rumble strengths separately and send a short test pulse to the built-in controller. Changes save automatically and apply across games.
+- **Back-button hardware modes:** switch between Macro, Combination and Disabled. Macro is recommended on SteamOS; Combination provides back-button shortcuts on Windows.
+- **Rumble repair:** use Repair plugin and controller to reinstall the plugin and software-reset the built-in controller while keeping your mappings. Reboot the handheld afterward to complete recovery.
+
+Management is enabled on first install. Restore system defaults and disable returns the built-in controller to the system's default configuration and keeps management disabled until you enable it again. External controllers are unaffected.
 
 ## Install and update
 
@@ -13,13 +31,6 @@ curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-su
 ```
 
 The installer verifies the release SHA-256 and restarts Decky. Updates retain mappings and management preference without resetting the controller. Save work, reboot the handheld and check plugin status. Installation completion does not confirm that mappings were applied. For a custom Decky home, use `bash -s -- install --decky-home /absolute/homebrew`.
-
-## Use
-
-- Management defaults to enabled on first install; explicit disable persists across reboot. Enabled management uses Xbox Elite and only the verified embedded A8 controller.
-- Default mappings apply unless a game's independent custom configuration is enabled. Games are keyed by Steam ID; duplicate names display their IDs. Copying changes local edits; saving commits them.
-- Hardware back-button mode and left/right rumble strengths are shared across games. Sliders save automatically; the finite rumble test targets only the embedded controller.
-- Restore system defaults and disable uses the installed InputPlumber defaults, not historical custom settings from another plugin. Missing defaults produce an error.
 
 ## Maintenance and removal
 
@@ -71,3 +82,12 @@ python3 scripts/check_versions.py
 Packaging requires PyYAML 6.0.3: run scripts/package.py and scripts/verify_package.py. CI also checks Python 3.11/3.13, Ruff and shell syntax.
 
 GPL-3.0-only. Dependencies and original project attribution: [THIRD_PARTY.md](THIRD_PARTY.md). [Design](docs/design.zh-CN.md), [integration review](docs/integration-review.zh-CN.md) and [research](docs/research.md) remain historical references.
+
+## Acknowledgments
+
+- [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber) by aarron-lee and its contributors, for the architectural and InputPlumber API usage reference.
+- [InputPlumber](https://github.com/ShadowBlip/InputPlumber), which provides controller input processing and virtual device support.
+- [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader), which provides the plugin platform and Steam UI integration.
+- [MSI Claw A8 Back Buttons & Rumble](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble), the original hardware-control implementation this suite builds on.
+
+Source provenance, reuse details and license notices are recorded in [THIRD_PARTY.md](THIRD_PARTY.md) and [third_party/](third_party/).
