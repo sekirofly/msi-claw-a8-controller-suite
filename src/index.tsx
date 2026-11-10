@@ -53,7 +53,7 @@ const reliableGame = (id?: string | null): id is string => !!id && /^[0-9]{1,20}
 
 function errorText(code?: string): string {
   const messages: Record<string, [string,string]> = {
-    not_a8:['未确认是 A8 主机','A8 motherboard was not identified'],
+    not_a8:['未确认是 A8 主机','This device could not be verified as an A8'],
     device_missing:['未找到已确认的内置控制接口','Verified embedded controls were not found'],
     device_ambiguous:['设备不唯一，已停止操作','Ambiguous device; operation blocked'],
     composite_ambiguous:['无法唯一确认内置 InputPlumber 设备','Cannot uniquely identify the embedded InputPlumber device'],
@@ -220,7 +220,7 @@ function RumblePanel({c,shared=true}: {c: Controller; shared?: boolean}) {
     {result?.state==='ok'&&row(t('上次测试：已向内置手柄发送 0.5 秒效果。','Last test: a 0.5 second effect was sent to the embedded controller.'))}
     {result?.state==='error'&&row(t('上次测试失败：','Last test failed: ')
       +(result.code&&result.code!=='operation_failed'?errorText(result.code):(result.detail||result.code||'')))}
-    {row(error || (saving?t('正在保存…','Saving…'):t('滑动自动保存；测试只触发内置手柄。','Sliders save automatically; testing targets only the embedded controller.')))}
+    {row(error || (saving?t('正在保存…','Saving…'):t('滑动自动保存；测试只触发内置手柄。','Changes save automatically; testing targets only the embedded controller.')))}
     {!c.state?.can_test && row(t('此设备的震动测试接口尚不可用','Rumble test interface is unavailable on this device'))}
   </PanelSection>;
 }
@@ -252,7 +252,7 @@ const mappingGroups = [
 // Keep firmware identifiers visible; descriptions explain when to use each mode.
 const MODES = [
   {key:'macro', zh:'Macro（宏）', en:'Macro', detailZh:'SteamOS 推荐，用于本套件的左右背键映射；插件不提供宏录制。', detailEn:'Recommended on SteamOS for this suite’s back-button mappings; the plugin does not record macros.'},
-  {key:'combination', zh:'Combination（组合键）', en:'Combination', detailZh:'固件组合键模式，可能影响左右背键的独立映射。', detailEn:'Firmware combination mode; may affect independent back-button mappings.'},
+  {key:'combination', zh:'Combination（组合键）', en:'Combination', detailZh:'用于 Windows 下的背键组合快捷操作。', detailEn:'For back-button combination shortcuts on Windows.'},
   {key:'disabled', zh:'Disabled（禁用）', en:'Disabled', detailZh:'禁用背键硬件功能。', detailEn:'Disable the hardware back-button function.'},
 ] as const;
 
@@ -304,8 +304,8 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
   const close=()=>dirty?confirm(t('放弃未保存修改？','Discard unsaved changes?'),t('已保存的配置保持不变。','Saved configuration stays unchanged.'),onClose):onClose();
   return <FocusEntry active><Focusable flow-children="column" onCancel={e=>{e.stopPropagation();close();}}>
     <PanelSection title={t('正在编辑：','Editing: ')+title}>
-      {row(scope==='default'?t('影响使用默认按键的游戏，不影响独立副本。','Affects games using defaults, not independent copies.'):
-        c.state?.game===scope?t('仅影响本游戏；保存并启用后应用。','Only this game; applied when saved and enabled.'):
+      {row(scope==='default'?t('影响使用默认按键的游戏，不影响游戏专用方案。','Affects games using default buttons; game-specific configurations are unchanged.'):
+        c.state?.game===scope?t('仅影响本游戏；保存并启用后应用。','Applies only to this game after saving with custom buttons enabled.'):
         t('本游戏当前未运行，保存后下次启动生效。','This game is not running; saved changes apply next launch.'))}
       {scope!=='default'&&<PanelSectionRow><ToggleField label={t('使用本游戏专用按键','Use this game’s custom buttons')}
         description={t('关闭后使用默认按键；保存后生效。','When off, use default buttons. Takes effect after saving.')} checked={enabled}
@@ -363,7 +363,7 @@ function QuickPanel() {
     ?t('正在读取…','Reading…')
     :s.game_known===false?t('无法识别，保持当前配置','Unrecognized; keeping current configuration')
     :game?gameLabel(s,game,s.game_name)
-    :s.game==='default'?t('未运行','Not running')
+    :s.game==='default'?t('当前无游戏运行','No game running')
     :t('无法识别，保持当前配置','Unrecognized; keeping current configuration');
   return <><PanelSection><PanelSectionRow>
     <ButtonItem layout="below" onClick={()=>open()}>{t('打开设置','Open settings')}</ButtonItem>
@@ -435,9 +435,8 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row(t('震动消失时，可先尝试下方“修复插件与手柄”；完成后需重启掌机。','If rumble stops working, try Repair plugin and controller below, then reboot the handheld.'))}
-        {row('0.1.1 · GPL-3.0-only')}
-        {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
+        {row('0.1.2 · GPL-3.0-only')}
+        {row(t('震动消失时，先用“修复插件与手柄”软件重置手柄，再重启掌机；若仍未恢复，再参考 MSI 官方说明手动重置 EC。','If rumble stops working, use Repair plugin and controller to reset the controller, then reboot the handheld. If the issue persists, follow MSI’s official instructions for a manual EC reset.'))}
         {maintenancePending&&row(t('正在维护，请等待 Decky 自动重启，暂时不要操作。','Maintenance in progress. Wait for Decky to restart; avoid operating the plugin.'))}
         {maintenanceError&&row(maintenanceError)}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem layout="below" disabled={c.busy||maintenancePending} onClick={()=>confirm(
@@ -476,7 +475,7 @@ export default definePlugin(()=>{
   routerHook.addRoute(route,()=> <SidebarNavigation title="MSI Claw A8 Controller Suite" showTitle pages={[
     {title:t('按键配置','Button configurations'),content:<Settings page="configs"/>,route:route+'/configs'},
     {title:t('手柄设置','Device settings'),content:<Settings page="hardware"/>,route:route+'/hardware'},
-    {title:t('维护与关于','Maintenance and about'),content:<Settings page="about"/>,route:route+'/about'},
+    {title:t('维护与关于','Maintenance & About'),content:<Settings page="about"/>,route:route+'/about'},
   ]}/>);
   return {name:'MSI Claw A8 Controller Suite',icon:<span>🎮</span>,content:<QuickPanel/>,onDismount(){
     stopMonitor();routerHook.removeRoute(route);void flushRumble().catch(()=>{});
