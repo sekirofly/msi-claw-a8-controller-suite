@@ -60,6 +60,10 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         await self.plugin.report_game(None, '')
         self.assertEqual(self.plugin.game, '12')
         self.assertEqual(self.plugin.game_name, 'Game')
+        self.assertFalse(self.plugin.game_known)
+        self.assertEqual(self.applied, [{}])
+        await self.plugin.report_game('12', 'Game')
+        self.assertTrue(self.plugin.game_known)
 
     async def test_cancelled_unload_does_not_strand_lock(self):
         entered = threading.Event()

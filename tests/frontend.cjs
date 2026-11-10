@@ -22,7 +22,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
   const state={config:{revision:0,default:{M2:['B'],M1:[]},games:{}},game:'1',game_name:'Game One',
     applied:'default',managed:true,paused:false,hardware,can_test:true,inputplumber:{sources:['M1','M2']}};
   const ui={Router:{MainRunningApp:{appid:1,display_name:'Game One'}},Navigation:{Navigate(){},CloseSideMenus(){}},showModal(el){el?.props?.onOK?.()}};
-  for(const n of ['ButtonItem','PanelSection','PanelSectionRow','SliderField','ToggleField','DropdownItem','TextField','ConfirmModal','SidebarNavigation','Focusable'])
+  for(const n of ['ButtonItem','PanelSection','PanelSectionRow','SliderField','ToggleField','DropdownItem','TextField','ConfirmModal','SidebarNavigation','Focusable','DialogButton'])
     ui[n]=props=>React.createElement(n,props,props.children);
   const api={definePlugin:f=>f,routerHook:{addRoute:(_,f)=>{factory=f},removeRoute(){}},callable:name=>async(...args)=>{
     calls.push([name,...args]);
@@ -46,10 +46,10 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     assert.match(json,language==='zh-CN'?/左 M2 → B/:/Left M2 → B/);
     assert.match(json,language==='zh-CN'?/右 M1 → 不输出/:/Right M1 → No output/);
     assert.doesNotMatch(json,/未运行游戏 \/ 尚未确认|基础映射 \/ 未确认/);
-    const summary=rendered.root.findAllByType('Focusable').find(x=>x.props.tabIndex===0);
+    const summary=rendered.root.findByType('DialogButton');
     assert.ok(summary,'summary participates in focus navigation');
-    assert.equal(rendered.root.findAllByType('Focusable').filter(x=>x.props.tabIndex===0).length,1,'one summary stop, not one per line');
-    assert.equal(summary.findAllByType('Focusable').length,1,'summary has no nested focus stops');
+    assert.equal(rendered.root.findAllByType('DialogButton').length,1,'one summary stop, not one per line');
+    assert.equal(summary.findAllByType('Focusable').length,0,'summary has no nested focus stops');
     assert.doesNotMatch(json,/MSI Claw A8 Controller Suite|仅管理 A8|Embedded A8 controller only/);
     assert.equal(typeof summary.props.onGamepadFocus,'function');
     const saved=JSON.parse(JSON.stringify(state));
@@ -65,7 +65,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       let preview;
       try{
         await act(async()=>{preview=create(plugin.content)});
-        const card=preview.root.findAllByType('Focusable').find(x=>x.props.tabIndex===0);
+        const card=preview.root.findByType('DialogButton');
         const text=node=>typeof node==='string'?node:node.children.map(text).join('');
         const content=text(card);
         assert.ok(content.includes(scenario.expected));
@@ -143,8 +143,8 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
           assert.doesNotMatch(configText,/MSI Claw A8 Controller Suite/);
           assert.ok(configText.includes(language==='zh-CN'?'管理已停用；修改可保存':'Management disabled; edits can be saved'));
           assert.equal(editor.root.findAllByType('PanelSection').filter(x=>x.props.title===(language==='zh-CN'?'按键配置':'Button configurations')).length,0);
-          const label=language==='zh-CN'?'编辑默认按键':'Edit default buttons';
-          const open=()=>editor.root.findAllByType('ButtonItem').find(x=>x.props.children===label);
+          const label=language==='zh-CN'?'编辑':'Edit';
+          const open=()=>editor.root.findAllByType('DialogButton').find(x=>x.props.children===label);
           await act(async()=>{open().props.onClick()});
           await waitFor(()=>focused.length===1);
           assert.equal(focused.length,1,'entering editor transfers focus');
@@ -169,4 +169,116 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       }
     } finally {await act(async()=>{settings?.unmount();navigation?.unmount()});}
   } finally {await act(async()=>rendered?.unmount());plugin.onDismount();}
+});
+
+for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate game IDs: ${language}`,async()=>{
+  Object.defineProperty(global,'navigator',{value:{language},configurable:true});
+  const zh=language==='zh-CN';const text=node=>typeof node==='string'?node:node.children.map(text).join('');
+  const state={config:{revision:0,default:{M2:['A']},games:{
+    '1':{name:'Same',enabled:true,rules:{M2:['B']}},
+    '2':{name:'Same',enabled:true,rules:{M2:['X']}},
+    '3':{name:'Unique',enabled:true,rules:{M2:['Y']}}
+  }},game:'1',game_name:'Same',applied:'1',managed:true,can_test:false,inputplumber:{sources:['M1','M2']}};
+  const calls=[],focus=[];let factory,modal,modalHandle;
+  const ui={Router:{},Navigation:{Navigate(){},CloseSideMenus(){}},showModal(element,parent,options){
+    let closed=false;
+    modal=create(element,{createNodeMock:e=>e.type==='Focusable'?{querySelector:()=>({focus:()=>focus.push('modal')})}:null});
+    const handle={Close(){if(closed)return;closed=true;modal.unmount();options?.fnOnClose?.();}};
+    modalHandle=handle;return handle;
+  }};
+  for(const n of ['ButtonItem','DialogButton','PanelSection','PanelSectionRow','SliderField','ToggleField','DropdownItem','ConfirmModal','SidebarNavigation','Focusable'])
+    ui[n]=props=>React.createElement(n,props,props.children);
+  const api={definePlugin:f=>f,routerHook:{addRoute:(_,f)=>{factory=f},removeRoute(){}},callable:name=>async(...args)=>{
+    calls.push([name,...args]);
+    if(name==='save_config'){
+      const [id,title,rules,enabled]=args;
+      if(id==='default')state.config.default=rules;else state.config.games[id]={name:title,rules,enabled};
+      state.config.revision++;
+    }
+    if(name==='delete_config'){delete state.config.games[args[0]];state.config.revision++;}
+    return {ok:true,data:JSON.parse(JSON.stringify(state))};
+  }};
+  const filename=path.resolve('src/index.tsx');
+  const compiled=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2020}}).outputText;
+  const mod=new Module(filename,module);mod.filename=filename;mod.paths=Module._nodeModulePaths(path.dirname(filename));
+  const original=mod.require.bind(mod);mod.require=n=>n==='@decky/ui'?ui:n==='@decky/api'?api:original(n);mod._compile(compiled,filename);
+  const plugin=mod.exports.default();let quick,nav,page;
+  try{
+    await act(async()=>{quick=create(plugin.content);nav=create(factory())});
+    const card=quick.root.findByType('DialogButton');
+    assert.match(text(card),/Same · ID 1/);
+    assert.equal(card.findAllByType('Focusable').length,0);
+    assert.equal(quick.root.findAllByType('DialogButton').length,1);
+    await act(async()=>{page=create(nav.root.findByType('SidebarNavigation').props.pages[0].content,
+      {createNodeMock:e=>e.type==='Focusable'?{querySelector:()=>({focus:()=>focus.push('page')})}:null})});
+    const section=label=>page.root.findAllByType('PanelSection').find(x=>x.props.title===label);
+    assert.ok(section('Same · ID 1'));assert.ok(section('Same · ID 2'));assert.ok(section('Unique'));
+    const defaults=section(zh?'默认按键':'Default buttons');
+    assert.equal(defaults.findAllByType('DialogButton').length,1,'default has Edit but no Delete');
+    assert.equal(section('Same · ID 1').findAllByType('DialogButton').length,2);
+    await act(async()=>{section('Same · ID 1').findAllByType('DialogButton')[0].props.onClick()});
+    await waitFor(()=>focus.length>0);
+    assert.ok(section((zh?'正在编辑：':'Editing: ')+'Same · ID 1'));
+    assert.equal(page.root.findAllByType('DropdownItem').length,16,'copy source is not on the editing page');
+    await act(async()=>{page.root.findByType('ToggleField').props.onChange(false)});
+    const copyButton=()=>page.root.findAllByType('ButtonItem').find(x=>x.props.children===(zh?'从其他方案复制…':'Copy from another configuration…'));
+    await act(async()=>{copyButton().props.onClick()});
+    await waitFor(()=>focus.includes('modal'));
+    const options=modal.root.findByType('DropdownItem').props.rgOptions;
+    assert.equal(options.find(o=>o.data==='2').label,'Same · ID 2');
+    assert.equal(options.find(o=>o.data==='3').label,'Unique');
+    assert.ok(!options.some(o=>o.data==='1'),'cannot copy from the same editing configuration');
+    await act(async()=>{modal.root.findByType('DropdownItem').props.onChange({data:'2'})});
+    const before=focus.length;
+    await act(async()=>{modal.root.findByType('ConfirmModal').props.onOK()});
+    await waitFor(()=>focus.length>before);
+    assert.equal(focus.at(-1),'page','return focus to copy entry');
+    const mapping=()=>page.root.findAllByType('DropdownItem').find(x=>x.props.label===(zh?'左 M2':'Left M2'));
+    assert.equal(mapping().props.selectedOption,'X');
+    assert.equal(page.root.findByType('ToggleField').props.checked,false,'copy must not enable custom configuration');
+    assert.equal(calls.filter(c=>c[0]==='save_config').length,0,'copy only changes local edits');
+    await act(async()=>{copyButton().props.onClick()});
+    await act(async()=>{modal.root.findByType('DropdownItem').props.onChange({data:'3'})});
+    await act(async()=>{modal.root.findByType('ConfirmModal').props.onCancel()});
+    assert.equal(mapping().props.selectedOption,'X','cancel leaves draft unchanged');
+    await act(async()=>{await page.root.findAllByType('ButtonItem').find(x=>String(x.props.children).startsWith(zh?'保存到：':'Save to: ')).props.onClick()});
+    await waitFor(()=>!!section('Same · ID 1'));
+    const save=calls.find(c=>c[0]==='save_config');
+    assert.equal(save[1],'1');assert.equal(save[2],'Same','ID suffix is presentation only');
+    assert.deepEqual(save[3],{M2:['X']});assert.equal(save[4],false);
+    assert.deepEqual(state.config.games['2'].rules,{M2:['X']},'source unchanged');
+    // Confirm deletion uses the selected ID, never the ambiguous name.
+    await act(async()=>{section('Same · ID 2').findAllByType('DialogButton')[1].props.onClick()});
+    assert.match(modal.root.findByType('ConfirmModal').props.strDescription,/Same · ID 2/);
+    await act(async()=>{modal.root.findByType('ConfirmModal').props.onOK();modalHandle.Close()});
+    await waitFor(()=>calls.some(c=>c[0]==='delete_config'));
+    assert.equal(calls.find(c=>c[0]==='delete_config')[1],'2');
+    assert.ok(state.config.games['1']);assert.equal(state.config.games['2'],undefined);
+    // A lost game ID retains the applied mapping but cannot create/edit a
+    // configuration using the previous game as if it were still current.
+    state.game_known=false;
+    let unknown;
+    try{
+      await act(async()=>{unknown=create(plugin.content)});
+      const unknownCard=unknown.root.findByType('DialogButton');
+      assert.ok(text(unknownCard).includes(zh?'无法识别，保持当前配置':'Unrecognized; keeping current configuration'));
+      await act(async()=>{unknownCard.props.onClick()});
+      let fallback;
+      try{
+        await act(async()=>{fallback=create(factory().props.pages[0].content)});
+        assert.ok(fallback.root.findAllByType('PanelSection').some(x=>x.props.title===(zh?'正在编辑：默认按键':'Editing: Default buttons')));
+        assert.equal(fallback.root.findAllByType('ToggleField').length,0);
+      }finally{await act(async()=>fallback?.unmount());}
+    }finally{await act(async()=>unknown?.unmount());}
+    state.game_known=true;
+    // The game card opens the current game's editor, retaining its raw ID/name.
+    await act(async()=>{card.props.onClick()});
+    let opened;
+    try{
+      await act(async()=>{opened=create(factory().props.pages[0].content)});
+      assert.ok(opened.root.findAllByType('PanelSection').some(x=>x.props.title===(zh?'正在编辑：':'Editing: ')+'Same'));
+    }finally{await act(async()=>opened?.unmount());}
+  }finally{
+    await act(async()=>{modalHandle?.Close();page?.unmount();nav?.unmount();quick?.unmount()});plugin.onDismount();
+  }
 });
