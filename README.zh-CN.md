@@ -28,7 +28,11 @@ MSI Claw A8（BZ2EM / MS-1T8K）内置手柄的 Decky 插件。本项目非 MSI 
 
 ## 安装与更新
 
-需要已安装 Decky，并停用原 DeckyPlumber、独立背键/震动插件，避免同时修改设备。SteamOS 桌面模式打开 Konsole，以普通用户运行：
+**前置条件：**安装 [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader)，并禁用所有其他手柄管理插件，例如 DeckyPlumber。
+
+### 在线安装
+
+在 SteamOS 桌面模式打开 Konsole，以普通用户运行：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.3/install.sh | bash
@@ -36,9 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-su
 
 安装器校验发行包 SHA-256 并重启 Decky。覆盖更新保留按键方案和管理选择，不自动重置手柄。保存工作并重启掌机后检查插件状态；安装成功不等于配置已应用。自定义 Decky 目录使用 `bash -s -- install --decky-home /绝对路径/homebrew`。
 
-### Decky 本地 ZIP 安装（可离线）
-
-掌机需已安装 Decky，并具备 InputPlumber。先停用 DeckyPlumber 和独立背键/震动插件。
+### 离线安装
 
 1. 在有网的设备上，从 [Releases](https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest) 下载附件 `msi-claw-a8-controller-suite.zip` 和同名 `.zip.sha256` 校验文件，**不要下载 GitHub 的 Source code 压缩包**。
 2. 通过 U 盘等方式将文件拷到掌机，例如 `~/Downloads/`。保留 ZIP，不要解压。
