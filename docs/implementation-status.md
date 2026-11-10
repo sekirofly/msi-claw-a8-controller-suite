@@ -1,5 +1,11 @@
 # Initial implementation status
 
+## Alpha.23: one component family on the quick panel
+
+- The summary is a standard settings row (``ButtonItem`` with a label and a trailing action) instead of a ``DialogButton``, which is the dialog-button primitive and carries different height, padding and background. Mixing the two families is what made the first row look foreign next to the rumble rows.
+- Open settings uses ``layout="below"`` like the rumble test, so its text is centred in a full-width row instead of sitting in the trailing control slot.
+- No behaviour change: the row still opens the editor, and the information rows below remain non-interactive.
+
 ## Alpha.22: one focusable row instead of a tall card
 
 - The quick panel makes only the action row focusable; the game, M2 and M1 lines are plain information again. A one-line focus target is always revealed completely by Steam's own focus scrolling, so no manual scroll correction is needed.

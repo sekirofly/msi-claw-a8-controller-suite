@@ -1,6 +1,6 @@
 {
   "name": "msi-claw-a8-controller-suite",
-  "version": "0.1.0-alpha.22",
+  "version": "0.1.0-alpha.23",
   "type": "module",
   "license": "GPL-3.0-only",
   "scripts": {
