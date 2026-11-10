@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {ButtonItem, PanelSection, PanelSectionRow, SliderField, ToggleField, DropdownItem,
-  ConfirmModal, showModal, Navigation, Router, SidebarNavigation, Focusable} from '@decky/ui';
+  ConfirmModal, DialogButton, showModal, Navigation, Router, SidebarNavigation, Focusable} from '@decky/ui';
 import {callable, definePlugin, routerHook} from '@decky/api';
 
 const route = '/msi-claw-a8-controller-suite';
@@ -8,7 +8,7 @@ const t = (zh: string, en: string) => /^zh(?:[-_]|$)/i.test(navigator.language) 
 type Rules = Record<string, string[]>;
 type Entry = {name: string; rules: Rules; enabled?: boolean};
 type Config = {revision: number; default: Rules; games: Record<string, Entry>};
-type State = {config: Config; game: string | null; game_name: string; applied: string | null; apply_error?: string;
+type State = {config: Config; game: string | null; game_name: string; game_known?: boolean; applied: string | null; apply_error?: string;
   managed: boolean; last_error?: string; call_log?: string[]; consistent?: boolean;
   pid?: number; started?: string;
   rumble_test?: {state: string; code?: string; detail?: string};
@@ -28,6 +28,15 @@ const keys = ['Space','Enter','Esc','Tab','LeftShift','LeftCtrl','LeftAlt', ...'
 const outputs = [...buttons, ...keys.map(k => 'key:Key'+k), 'mouse:Left','mouse:Right','mouse:Middle'];
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 const buttonLabel = (key: string) => key==='M2'?t('左 M2','Left M2'):key==='M1'?t('右 M1','Right M1'):key;
+function gameLabel(state: State, id: string, name?: string) {
+  const label=name?.trim() || state.config.games[id]?.name.trim() || id;
+  const names=Object.entries(state.config.games).map(([key,e])=>({id:key,name:e.name}));
+  if(state.game && state.game!=='default')names.push({id:state.game,name:state.game_name});
+  const duplicate=['默认按键','Default buttons'].includes(label) || names.some(e=>e.id!==id && e.name.trim().toLowerCase()===label.toLowerCase());
+  return duplicate?`${label} · ID ${id}`:label;
+}
+const reliableGame = (id?: string | null): id is string => !!id && /^[0-9]{1,20}$/.test(id) && /[1-9]/.test(id);
+
 
 function errorText(code?: string): string {
   const messages: Record<string, [string,string]> = {
@@ -180,20 +189,19 @@ function RumblePanel({c,shared=true}: {c: Controller; shared?: boolean}) {
 }
 
 // Transfer focus only on an explicit view transition, never on status refreshes.
-function FocusEntry({active,children}: {active:boolean;children:React.ReactNode}) {
+function FocusEntry({active,revision=0,children}: {active:boolean;revision?:number;children:React.ReactNode}) {
   const ref=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(!active)return;
     let frame=0;
     frame=requestAnimationFrame(()=>{frame=requestAnimationFrame(()=>{
       const root=ref.current;
-      const target=root?.querySelector<HTMLElement>('button:not(:disabled), [role="button"]:not([aria-disabled="true"])')
-        ?? root?.querySelector<HTMLElement>('select:not(:disabled), input:not(:disabled)')
+      const target=root?.querySelector<HTMLElement>('button:not(:disabled), [role="button"]:not([aria-disabled="true"]), select:not(:disabled), input:not(:disabled)')
         ?? root?.querySelector<HTMLElement>('[tabindex="0"]');
       target?.focus();
     });});
     return ()=>cancelAnimationFrame(frame);
-  },[active]);
+  },[active,revision]);
   return <Focusable ref={ref} flow-children="column" preferredFocus={active} noFocusRing>{children}</Focusable>;
 }
 const mappingGroups = [
@@ -212,31 +220,65 @@ const MODES = [
   {key:'disabled', zh:'Disabled（禁用）', en:'Disabled'},
 ] as const;
 
+function CopyDialog({choices,onCopy,onClose}: {choices:{data:string;label:string;rules:Rules}[];onCopy:(rules:Rules)=>void;onClose:()=>void}) {
+  const [source,setSource]=useState(choices[0]?.data);
+  return <ConfirmModal strTitle={t('从其他方案复制','Copy from another configuration')}
+    strDescription={t('将替换当前编辑内容，保存后生效。','Replaces the current edits. Changes take effect after saving.')}
+    strOKButtonText={t('复制','Copy')} strCancelButtonText={t('取消','Cancel')}
+    bOKDisabled={!choices.some(c=>c.data===source)} onCancel={onClose} onEscKeypress={onClose}
+    onOK={()=>{const selected=choices.find(c=>c.data===source);if(selected){onCopy(clone(selected.rules));onClose();}}}>
+    <FocusEntry active><DropdownItem label={t('选择方案','Configuration')} selectedOption={source}
+      rgOptions={choices.map(({data,label})=>({data,label}))} onChange={(v:{data:string})=>setSource(v.data)}/></FocusEntry>
+  </ConfirmModal>;
+}
+function ConfigurationCard({title,description,onEdit,onDelete,restoreFocus}: {
+  title:string;description:string;onEdit:()=>void;onDelete?:()=>void;restoreFocus:boolean;
+}) {
+  return <PanelSection title={title}>
+    {row(description)}
+    <FocusEntry active={restoreFocus}>
+      <Focusable flow-children="row" style={{display:'flex',gap:12}}>
+        <DialogButton style={{flex:1}} onClick={onEdit}>{t('编辑','Edit')}</DialogButton>
+        {onDelete?<DialogButton style={{flex:1}} onClick={onDelete}>{t('删除','Delete')}</DialogButton>:<span aria-hidden style={{flex:1}}/>}
+      </Focusable>
+    </FocusEntry>
+  </PanelSection>;
+}
+
 function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: string; onClose: () => void}) {
   const config=c.state!.config;
   const entry = scope==='default'?undefined:config.games[scope];
   const [rules,setRules]=useState<Rules>(()=>clone(entry?.rules ?? config.default));
   const [enabled,setEnabled]=useState(entry?.enabled ?? true);
-  const title=name;
+  const title=scope==='default'?t('默认按键','Default buttons'):gameLabel(c.state!,scope,name);
   const [dirty,setDirty]=useState(false);
-  const [source,setSource]=useState('default');
+  const [copyReturn,setCopyReturn]=useState(0);
   const [revision,setRevision]=useState(config.revision);
-  const choices=[{data:'default',label:t('默认按键','Default buttons')},
-    ...Object.entries(config.games).filter(([id])=>id!==scope).map(([id,e])=>({data:id,label:e.name}))];
-  function copySource() {
-    const copied=source==='default'?config.default:config.games[source].rules;
-    setRules(clone(copied));setDirty(true);
+  const choices=[...(scope==='default'?[]:[{data:'default',label:t('默认按键','Default buttons'),rules:config.default}]),
+    ...Object.entries(config.games).filter(([id])=>id!==scope).map(([id,e])=>({data:id,label:gameLabel(c.state!,id),rules:e.rules}))];
+  const copyModal=useRef<ReturnType<typeof showModal> | undefined>(undefined);
+  const mounted=useRef(true);
+  useEffect(()=>{mounted.current=true;return ()=>{mounted.current=false;copyModal.current?.Close();};},[]);
+  function openCopy() {
+    if(!choices.length)return;
+    const modal=showModal(<CopyDialog choices={choices} onCopy={copied=>{setRules(copied);setDirty(true);}}
+      onClose={()=>modal.Close()}/>,undefined,{fnOnClose:()=>{copyModal.current=undefined;if(mounted.current)setCopyReturn(v=>v+1);}});
+    copyModal.current=modal;
   }
   const close=()=>dirty?confirm(t('放弃未保存修改？','Discard unsaved changes?'),t('已保存的配置保持不变。','Saved configuration stays unchanged.'),onClose):onClose();
-  return <Focusable flow-children="column" onCancel={e=>{e.stopPropagation();close();}}>
-    <PanelSection title={t('正在编辑：','Editing: ')+(scope==='default'?t('默认按键','Default buttons'):title)}>
+  return <FocusEntry active><Focusable flow-children="column" onCancel={e=>{e.stopPropagation();close();}}>
+    <PanelSection title={t('正在编辑：','Editing: ')+title}>
       {row(scope==='default'?t('影响使用默认按键的游戏，不影响独立副本。','Affects games using defaults, not independent copies.'):
         c.state?.game===scope?t('仅影响本游戏；保存并启用后应用。','Only this game; applied when saved and enabled.'):
         t('本游戏当前未运行，保存后下次启动生效。','This game is not running; saved changes apply next launch.'))}
-      {scope!=='default'&&<PanelSectionRow><ToggleField label={t('使用本游戏专用按键','Use this game’s custom buttons')} checked={enabled}
+      {scope!=='default'&&<PanelSectionRow><ToggleField label={t('使用本游戏专用按键','Use this game’s custom buttons')}
+        description={t('关闭后使用默认按键；保存后生效。','When off, use default buttons. Takes effect after saving.')} checked={enabled}
         onChange={v=>{setEnabled(v);setDirty(true);}}/></PanelSectionRow>}
-      <FocusEntry active><PanelSectionRow><DropdownItem label={t('复制来源','Copy from')} selectedOption={source} rgOptions={choices} onChange={(v:{data:string})=>setSource(v.data)}/></PanelSectionRow></FocusEntry>
-      <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>confirm(t('替换编辑草稿','Replace draft'),t('复制后互不关联；保存前不改变已有配置。','Copies are independent. Existing settings change only after saving.'),copySource)}>{t('复制到此草稿','Copy into this draft')}</ButtonItem></PanelSectionRow>
+    </PanelSection>
+    <PanelSection>
+      <FocusEntry active={copyReturn>0} revision={copyReturn}><PanelSectionRow><ButtonItem disabled={c.busy||!choices.length}
+        description={!choices.length?t('暂无其他可复制的方案','No other configurations to copy'):undefined}
+        onClick={openCopy}>{t('从其他方案复制…','Copy from another configuration…')}</ButtonItem></PanelSectionRow></FocusEntry>
     </PanelSection>
     <PanelSection title={t('按键映射','Button mappings')}>
       {mappingGroups.map(group=><div key={group.en} style={{marginBottom:12}}>
@@ -253,14 +295,14 @@ function Editor({c,scope,name,onClose}: {c: Controller; scope: string; name: str
     </PanelSection>
     <PanelSection>
       <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>void c.run(async()=>{
-        const r=await enqueue(()=>saveConfig(scope,title,rules,enabled,revision));
+        const r=await enqueue(()=>saveConfig(scope,name,rules,enabled,revision));
         setRevision(r.config.revision);setDirty(false);
         if(r.apply_error) throw new Error(t('已保存，未生效：','Saved, not applied: ')+errorText(r.apply_error));
         setDirty(false);onClose();
       })}>{scope==='default'?t('保存默认按键','Save default buttons'):t('保存到：','Save to: ')+title}</ButtonItem></PanelSectionRow>
       <PanelSectionRow><ButtonItem disabled={c.busy} onClick={close}>{t('返回','Back')}</ButtonItem></PanelSectionRow>
     </PanelSection>
-  </Focusable>;
+  </Focusable></FocusEntry>;
 }
 
 let requestedScope: {scope:string;name:string}|undefined;
@@ -277,12 +319,12 @@ function QuickPanel() {
       frame.current=requestAnimationFrame(()=>top.current?.scrollIntoView({block:'start',behavior:'auto'}));
     });
   }
-  const game=s?.game && s.game!=='default'?s.game:undefined;
+  const game=s?.game_known!==false&&reliableGame(s?.game)?s.game:undefined;
   const scope=s?.applied;
   const rules=scope==='default'?s?.config.default:scope?s?.config.games[scope]?.rules:undefined;
   const current=!s?.managed?t('管理已停用','Management disabled'):
     scope==='default'?t('默认按键','Default buttons'):
-    scope?s?.config.games[scope]?.name??scope:t('尚未生效','Not applied');
+    scope&&s?gameLabel(s,scope):t('尚未生效','Not applied');
   function outputLabel(key:string) {
     const outputs=rules?.[key];
     return outputs===undefined?t('系统默认映射','System default mapping'):
@@ -292,21 +334,21 @@ function QuickPanel() {
     requestedScope=scope?{scope,name:name??''}:undefined;
     Navigation.Navigate(route);Navigation.CloseSideMenus();
   }
-  return <><div ref={top}><Feedback c={c}/>{s&&<PanelSection>
+  return <><div ref={top} onFocusCapture={revealTop} onBlurCapture={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node | null))cancelAnimationFrame(frame.current);}}><Feedback c={c}/>{s&&<PanelSection>
     <PanelSectionRow>
-      <Focusable tabIndex={0} role="group" aria-label={t('当前按键摘要','Current button summary')}
-        onFocus={revealTop} onGamepadFocus={revealTop}
-        style={{padding:'10px 4px',lineHeight:1.5,overflowWrap:'anywhere'}}>
+      <DialogButton disabled={c.busy} onGamepadFocus={revealTop}
+        onClick={()=>open(game??'default',game?s.game_name:t('默认按键','Default buttons'))}
+        style={{width:'100%',height:'auto',textAlign:'left',padding:12,lineHeight:1.5,whiteSpace:'normal',overflowWrap:'anywhere'}}>
         <div style={{fontSize:16,fontWeight:600}}>{t('当前按键：','Current buttons: ')+current}</div>
         <div style={{fontSize:13,marginTop:4}}>{t('游戏：','Game: ')+(s.game===null
-          ?t('正在读取…','Reading…'):game?(s.game_name||game):t('未运行','Not running'))}</div>
+          ?t('正在读取…','Reading…'):s.game_known===false?t('无法识别，保持当前配置','Unrecognized; keeping current configuration'):game?gameLabel(s,game,s.game_name):s.game==='default'?t('未运行','Not running'):t('无法识别，保持当前配置','Unrecognized; keeping current configuration'))}</div>
         {s.managed&&rules&&<div style={{fontSize:14,marginTop:8}}>
           {['M2','M1'].map(key=><div key={key}>{buttonLabel(key)+' → '+outputLabel(key)}</div>)}
         </div>}
-      </Focusable>
+        <div style={{textAlign:'right',fontSize:14,marginTop:8}}>{game&&!s.config.games[game]
+          ?t('为本游戏设置按键 ›','Customize this game ›'):t('编辑按键 ›','Edit buttons ›')}</div>
+      </DialogButton>
     </PanelSectionRow>
-    <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>open(game??'default',game?s.game_name:t('默认按键','Default buttons'))}>
-      {game?(s.config.games[game]?t('编辑：','Edit: '):t('为本游戏单独设置：','Customize this game: '))+s.game_name:t('编辑默认按键','Edit default buttons')}</ButtonItem></PanelSectionRow>
   </PanelSection>}</div><RumblePanel c={c}/><PanelSection><PanelSectionRow><ButtonItem onClick={()=>open()}>{t('打开设置','Open settings')}</ButtonItem></PanelSectionRow></PanelSection></>;
 }
 
@@ -319,15 +361,20 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
   if(!s)return <Feedback c={c}/>;
   if(editing)return <><Feedback c={c} showDisabled/><Editor key={editing.scope} c={c} {...editing} onClose={closeEditor}/></>;
   return <><Feedback c={c} showDisabled={page==='configs'}/>
-    {page==='configs'&&<PanelSection>
-      <FocusEntry active={returnTo.current==='default'}><PanelSectionRow><ButtonItem onClick={()=>openEditor({scope:'default',name:t('默认按键','Default buttons')})}>{t('编辑默认按键','Edit default buttons')}</ButtonItem></PanelSectionRow></FocusEntry>
-      {s.game&&s.game!=='default'&&!s.config.games[s.game]&&<FocusEntry active={returnTo.current===s.game}><PanelSectionRow><ButtonItem onClick={()=>openEditor({scope:s.game!,name:s.game_name})}>{t('为当前游戏创建：','Create for current game: ')+s.game_name}</ButtonItem></PanelSectionRow></FocusEntry>}
-      {Object.entries(s.config.games).map(([id,e])=><PanelSection key={id} title={e.name}>
-        {row(e.enabled?t('已启用专用配置','Custom configuration enabled'):t('已停用，当前跟随默认','Disabled; uses defaults'))}
-        <FocusEntry active={returnTo.current===id}><PanelSectionRow><ButtonItem onClick={()=>openEditor({scope:id,name:e.name})}>{t('编辑','Edit')}</ButtonItem></PanelSectionRow></FocusEntry>
-        <PanelSectionRow><ButtonItem disabled={c.busy} onClick={()=>confirm(t('删除专用配置？','Delete custom configuration?'),e.name,()=>void c.run(()=>enqueue(()=>deleteConfig(id,s.config.revision))))}>{t('删除并使用默认','Delete and use defaults')}</ButtonItem></PanelSectionRow>
-      </PanelSection>)}
-    </PanelSection>}
+    {page==='configs'&&<>
+      <ConfigurationCard title={t('默认按键','Default buttons')} description={t('未启用游戏专用方案时使用','Used when no game-specific configuration is enabled')}
+        restoreFocus={returnTo.current==='default'} onEdit={()=>openEditor({scope:'default',name:t('默认按键','Default buttons')})}/>
+      {s.game_known!==false&&reliableGame(s.game)&&!s.config.games[s.game]&&<PanelSection>
+        <FocusEntry active={returnTo.current===s.game}><PanelSectionRow><ButtonItem onClick={()=>openEditor({scope:s.game!,name:s.game_name})}>
+          {t('为当前游戏创建：','Create for current game: ')+gameLabel(s,s.game,s.game_name)}</ButtonItem></PanelSectionRow></FocusEntry>
+      </PanelSection>}
+      {Object.entries(s.config.games).map(([id,e])=><ConfigurationCard key={id} title={gameLabel(s,id)}
+        description={e.enabled?t('专用按键已启用','Custom buttons enabled'):t('专用按键已停用，使用默认按键','Custom buttons disabled; uses default buttons')}
+        restoreFocus={returnTo.current===id} onEdit={()=>openEditor({scope:id,name:e.name})}
+        onDelete={()=>confirm(t('删除专用配置？','Delete custom configuration?'),
+          gameLabel(s,id)+' · '+t('删除后使用默认按键。','Default buttons will be used after deletion.'),
+          ()=>void c.run(()=>enqueue(()=>deleteConfig(id,s.config.revision))))}/>)}
+    </>}
     {page==='hardware'&&<>
       <PanelSection>{row(t('本页设置对所有游戏生效','Settings on this page apply to all games'))}</PanelSection>
       <PanelSection title={t('背键硬件模式','Back-button hardware mode')}>
@@ -353,7 +400,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.19 · GPL-3.0-only')}
+        {row('0.1.0-alpha.20 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
         {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem disabled={c.busy} onClick={()=>confirm(
           action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装当前版本','Repair current version'),
@@ -372,21 +419,23 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
 }
 
 export default definePlugin(()=>{
-  let last:string|undefined;let reported:string|undefined;let stable=0;let ticking=false;
+  let last:string|null|undefined;let reported:string|null|undefined;let stable=0;let ticking=false;
   const tick=async()=>{
     if(ticking)return;ticking=true;
     try {
       const app=Router.MainRunningApp;
-      const id=app?.appid?String(app.appid):'default';
+      const candidate=app?.appid?String(app.appid):undefined;
+      const id=!app || (!app.appid && !app.display_name)?'default':reliableGame(candidate)?candidate:null;
       // Only a change is worth a backend call. The old periodic re-report fed a
       // 5 s backend poll; both are gone now.
       if(id===reported)return;
       stable=id===last?stable+1:0;last=id;
       if(stable<2)return;
+      const result=await reportGame(id,app?.display_name??'');
+      if(!result.ok)throw new Error(result.error);
       reported=id;
-      await reportGame(id,app?.display_name??'');
       stateListeners.forEach(fn=>fn());
-    } catch {await reportGame(null,'').catch(()=>{});} finally {ticking=false;}
+    } catch {reported=undefined;await reportGame(null,'').catch(()=>{});stateListeners.forEach(fn=>fn());} finally {ticking=false;}
   };
   const interval=setInterval(()=>void tick(),1000);
   routerHook.addRoute(route,()=> <SidebarNavigation title="MSI Claw A8 Controller Suite" showTitle pages={[

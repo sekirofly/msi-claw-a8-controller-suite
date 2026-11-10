@@ -1,5 +1,13 @@
 # Initial implementation status
 
+## Alpha.20: native action cards, copy dialog and duplicate names
+
+- Hardware feedback showed the plain text summary was still skipped by Steam navigation. Replace it with one native Decky DialogButton combining summary and editor entry, scrolling to the top on focus.
+- Default/game configurations share title, scope/status and Edit/Delete actions; default cannot be deleted.
+- Copying uses a separate dialog, changes only local mapping edits, preserves the enable toggle and returns focus on close. Cancel leaves edits unchanged.
+- Disambiguate duplicate names in every game selector/title with display-only ID suffixes. Copy/save/delete retain raw IDs and names. Unknown game reports retain applied mappings without treating the previous game as current.
+- Chinese/English component and Chromium DOM checks cover card activation/top scrolling, copy/cancel focus, empty sources and ID isolation. Native Steam gamepad navigation still requires hardware confirmation.
+
 ## Alpha.19: consistent game-status row
 
 Always show Game: Not running / game name / Reading… on the second summary line. Configuration selection and the single summary focus stop are unchanged.

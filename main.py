@@ -36,6 +36,7 @@ class Plugin:
         self.ip = None
         self.game = None
         self.game_name = ''
+        self.game_known = False
         self.applied = None
         self.apply_error = None
         self.last_test = 0.0
@@ -99,7 +100,7 @@ class Plugin:
             return {'ok': False, 'error': code}
 
     def status(self):
-        state = {'config': self.store.snapshot(), 'game': self.game, 'game_name': self.game_name,
+        state = {'config': self.store.snapshot(), 'game': self.game, 'game_name': self.game_name, 'game_known': self.game_known,
                  'applied': self.applied, 'apply_error': self.apply_error,
                  'managed': self.ip.enabled, 'last_error': self.last_error,
                  'pid': os.getpid(), 'started': self.started_at,
@@ -149,8 +150,9 @@ class Plugin:
             return {'ok': False, 'error': 'invalid_game'}
         def update():
             if game_id is None:
+                self.game_known = False
                 return {'applied': self.applied, 'apply_error': self.apply_error}
-            self.game, self.game_name = game_id, name
+            self.game, self.game_name, self.game_known = game_id, name, True
             self.apply_selected()
             return {'applied': self.applied, 'apply_error': self.apply_error}
         return await self.operation(update, 'report_game')
