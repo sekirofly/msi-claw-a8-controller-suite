@@ -1,11 +1,17 @@
 """Root-owned temporary runner, launched by systemd independently of Decky."""
 from pathlib import Path
 import shutil
+import subprocess
 from installer import main
 
 if __name__ == '__main__':
     try:
         main()
+    except Exception:
+        # Even a download failure must release the old plugin's pending state.
+        # The independent job/journal retains the actual error for diagnosis.
+        subprocess.run(['systemctl', 'restart', 'plugin_loader.service'], check=False, timeout=60)
+        raise
     finally:
         directory = Path(__file__).resolve().parent
         if directory.parent == Path('/run') and directory.name.startswith('msi-claw-a8-controller-suite-maintenance-'):

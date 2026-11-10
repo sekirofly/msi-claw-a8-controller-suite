@@ -369,6 +369,15 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
   const c=useController();const s=c.state;
   const [editing,setEditing]=useState<{scope:string;name:string}|undefined>(()=>{const req=requestedScope;requestedScope=undefined;return page==='configs'?req:undefined;});
   const returnTo=useRef<string|undefined>(undefined);
+  const [maintenancePending,setMaintenancePending]=useState(false);
+  const [maintenanceError,setMaintenanceError]=useState('');
+  async function startMaintenance(action:string) {
+    if(maintenancePending)return;
+    setMaintenancePending(true);setMaintenanceError('');
+    try {await flushRumble();await enqueue(()=>maintenance(action));}
+    catch(e){setMaintenancePending(false);setMaintenanceError(String(e));}
+  }
+
   function openEditor(entry:{scope:string;name:string},origin=entry.scope){returnTo.current=origin;setEditing(entry);}
   function closeEditor(){setEditing(undefined);}
   if(!s)return <Feedback c={c}/>;
@@ -413,13 +422,17 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>
       <PanelSection title={t('安装与维护','Installation and maintenance')}>
-        {row('0.1.0-alpha.31 · GPL-3.0-only')}
+        {row('0.1.0-alpha.32 · GPL-3.0-only')}
         {row(t('安装后请重启；持续震动异常可参考 MSI 官方 EC 恢复说明。','Reboot after installation. For persistent rumble issues, consult MSI’s official EC reset guidance.'))}
-        {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem layout="below" disabled={c.busy} onClick={()=>confirm(
-          action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装当前版本','Repair current version'),
-          t('将短暂重启 Decky。修复保留配置；重装清除按键配置并保留启用选择；卸载先恢复系统默认。硬件震动与背键模式不重置。卸载恢复失败时保留文件。','Decky restarts briefly. Repair keeps settings; reinstall clears mappings and keeps the management choice; uninstall restores system defaults first. Hardware settings stay unchanged. Failed uninstall restoration preserves files.'),
-          ()=>void c.run(()=>enqueue(()=>maintenance(action))))}>
-          {action==='uninstall'?t('干净卸载','Clean uninstall'):action==='reinstall'?t('干净重装当前版本','Clean reinstall current version'):t('修复安装 · 保留配置','Repair installation · keep configurations')}
+        {maintenancePending&&row(t('正在维护，请等待 Decky 自动重启，暂时不要操作。','Maintenance in progress. Wait for Decky to restart; avoid operating the plugin.'))}
+        {maintenanceError&&row(maintenanceError)}
+        {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem layout="below" disabled={c.busy||maintenancePending} onClick={()=>confirm(
+          action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('清除配置并重新安装','Clear configurations and reinstall'):t('修复插件与手柄','Repair plugin and controller'),
+          action==='uninstall'?t('卸载前恢复系统默认。确认后请等待 Decky 自动重启。','Restore system defaults before removal. After confirming, wait for Decky to restart.'):
+            (action==='reinstall'?t('将删除默认按键和全部游戏专用方案。','Deletes default mappings and all game-specific configurations.'):t('保留全部按键方案，重新安装当前版本。','Retains all mappings and reinstalls the current version.'))+' '+
+            t('随后软件重置内置手柄，背键模式和震动强度可能回到设备默认值。Decky 自动重启后，请保存工作并重启掌机，完成手柄恢复。','Then reset the internal controller; hardware mode and rumble strengths may return to device defaults. After Decky restarts, save work and reboot the handheld to complete recovery.'),
+          ()=>void startMaintenance(action))}>
+          {action==='uninstall'?t('干净卸载','Clean uninstall'):action==='reinstall'?t('清除配置并重新安装','Clear configurations and reinstall'):t('修复插件与手柄','Repair plugin and controller')}
         </ButtonItem></PanelSectionRow>)}
       </PanelSection>
       <PanelSection title={t('诊断信息','Diagnostics')}>

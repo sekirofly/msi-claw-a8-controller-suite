@@ -1,6 +1,6 @@
 # MSI Claw A8 Controller Suite
 
-Alpha.26 restores the natural order on the quick panel: the status rows come first and the edit action sits below them. The action is the only focus stop, so Steam only has to reveal one small row, and the context above it stays adjacent.
+Alpha.32 combines plugin/controller repair while retaining mappings. Clear configurations and reinstall removes mappings. Both maintenance actions reset the internal controller and require a handheld reboot; hardware settings are not backed up or reapplied. An inline notice asks users to wait for Decky. Ordinary updates do not reset the controller.
 
 > Fresh installs default to enabled. Explicit disable persists across reboot until enabled again. Restoration means system defaults, not another plugin’s or an earlier custom configuration.
 
@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md)
 
 A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / BZ2EM)**, combining the hardware controls from [MSI Claw A8 Back Buttons & Rumble](https://github.com/sekirofly/msi-claw-a8-back-buttons-rumble) with selected InputPlumber integration inspired by [DeckyPlumber](https://github.com/aarron-lee/DeckyPlumber).
 
-**Status: v0.1.0-alpha.31 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
+**Status: v0.1.0-alpha.32 preview for A8 testing, not a stable or device-validated release.** The existing Back Buttons & Rumble plugin remains a separate project. Other Claw models, including Claw 8 AI+, are outside the initial scope. This is community software, not an official MSI product.
 
 ## Install / update the preview
 
@@ -16,7 +16,7 @@ A Decky controller-management plugin for **MSI Claw A8 (AMD Ryzen Z2 Extreme / B
 2. In SteamOS Desktop Mode, open Konsole and run as your normal desktop user:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.31/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.32/install.sh | bash
 ```
 
 3. **Save work and reboot before returning to Gaming Mode.** If vibration remains unavailable after reboot, an EC reset may help; follow [MSI's official EC reset guidance](https://www.msi.com/support/technical_details/HH_EC_Reset). EC reset is not required routinely and is never automated.
@@ -28,20 +28,20 @@ No system Python changes are needed: pure-Python PyYAML is bundled. Unknown boar
 
 ## Repair, clean reinstall, uninstall
 
-The Maintenance page provides repair (same version, keep configurations), clean reinstall and clean uninstall. For a newer release, run that release's install command. Terminal alternatives:
+Maintenance provides Repair plugin and controller, Clear configurations and reinstall, and Clean uninstall. The first two reset the internal controller and require a handheld reboot after Decky restarts. For a newer release, run that release's install command. Terminal alternatives:
 
 ```sh
 # Clean reinstall: clear mappings, retain enabled/disabled choice, install again
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.31/install.sh | bash -s -- reinstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.32/install.sh | bash -s -- reinstall
 # Clean uninstall
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.31/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.0-alpha.32/install.sh | bash -s -- uninstall
 # Offline clean uninstall using installed code
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```
 
 Default Decky home is `~/homebrew`. For a different location append `-s -- install --decky-home /absolute/homebrew` after `bash` (use the requested action instead of `install`). Do not launch the default command as root; that would choose `/root/homebrew`.
 
-Update/repair replaces files and restarts Decky while retaining all configuration. Clean reinstall clears mappings but retains the management choice. Neither restores the device first. Uninstall restores system defaults before removing files; failed restoration preserves the installation and reports the error. `--skip-restore` explicitly bypasses restoration.
+Ordinary terminal updates replace files and restart Decky while retaining configuration. Maintenance repair/reinstall additionally resets the internal controller without backing up/reapplying hardware settings. Terminal use requires an explicit `--reset-controller` flag for this reset. Clean reinstall clears mappings but retains the management choice. Neither restores the device first. Uninstall restores system defaults before removing files; failed restoration preserves the installation and reports the error. `--skip-restore` explicitly bypasses restoration.
 
 Defaults come from the installed `/usr/share/inputplumber/profiles/default.yaml` and `devices/50-msi_claw_a8_bz2e.yaml`. An existing `/usr/local/share/inputplumber` takes precedence, as upstream does. Third-party `/etc` overrides are not factory defaults. Missing or incompatible files stop device writes rather than guessing from a Steam display name; run `diagnostics.sh` for details. Old `recovery.json` files are retained only as legacy backups, archived under `~/homebrew/.msi-claw-a8-controller-suite-recovery/` before clean reinstall/uninstall. New installs create no snapshot.
 

@@ -19,6 +19,22 @@ class HardwareTests(unittest.TestCase):
         (dmi/'board_vendor').write_text('Micro-Star International Co., Ltd.')
         self.hw = Hardware(self.sys)
 
+    def test_reset_does_not_save_or_reapply_hardware_settings(self):
+        device = self.sys / 'controller'
+        device.mkdir()
+        (device / 'reset').write_text('')
+        (device / 'mkeys_function').write_text('macro')
+        (device / 'rumble_intensity_left').write_text('35')
+        with patch.object(self.hw, 'discover', return_value={'path': device}), patch('os.geteuid', return_value=0):
+            self.hw.reset_controller()
+        self.assertEqual((device / 'reset').read_text(), '1\n')
+        self.assertEqual((device / 'mkeys_function').read_text(), 'macro')
+        self.assertEqual((device / 'rumble_intensity_left').read_text(), '35')
+        (device / 'reset').unlink()
+        with patch.object(self.hw, 'discover', return_value={'path': device}), patch('os.geteuid', return_value=0):
+            with self.assertRaisesRegex(SuiteError, 'reset_unavailable'):
+                self.hw.reset_controller()
+
     def usb(self, port='3'):
         p = self.sys / 'devices/pci0000:00/0000:c6:00.0/usb1' / ('1-'+port)
         p.mkdir(parents=True, exist_ok=True)
