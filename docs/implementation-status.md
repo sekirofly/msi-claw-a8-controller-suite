@@ -1,5 +1,9 @@
 # Initial implementation status
 
+## Alpha.29: restore a fixed quick-panel layout
+
+Use a native no-op version button at the top as a focus anchor, followed by plain status rows and one contextual Edit action. A reliable running game opens its custom configuration, otherwise defaults. Remove the extra game action and clickable scope label.
+
 ## Alpha.28: restore game-specific entry
 
 When the current game is not the applied scope, offer creation/editing of its custom configuration. The top action still edits the displayed scope. New configurations independently copy defaults; no game entry is shown without a reliable current game.

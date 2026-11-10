@@ -49,25 +49,14 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
     // The summary action is the only button that ends with the chevron.
     const summaryButtons=()=>rendered.root.findAllByType('ButtonItem').filter(x=>String(x.props.children).includes('›'));
     const summary=summaryButtons()[0];
+    const version=rendered.root.findAllByType('ButtonItem')[0];
+    assert.match(String(version.props.children),/0\.1\.0-alpha\.29/);
+    const beforeVersion=calls.length;
+    await act(async()=>{version.props.onClick()});
+    assert.equal(calls.length,beforeVersion,'version focus anchor performs no operation');
+
     assert.ok(summary,'summary participates in focus navigation');
     assert.equal(summaryButtons().length,1,'one summary action, not one per line');
-    let defaultEditor;
-    try{
-      await act(async()=>{summary.props.onClick();defaultEditor=create(factory().props.pages[0].content)});
-      assert.ok(defaultEditor.root.findAllByType('PanelSection').some(x=>x.props.title===(language==='zh-CN'?'正在编辑：默认按键':'Editing: Default buttons')),
-        'running game using defaults opens the displayed default configuration');
-    }finally{await act(async()=>defaultEditor?.unmount());}
-    let customEditor;
-    try{
-      const createCustom=rendered.root.findAllByType('ButtonItem').find(x=>x.props.children===(language==='zh-CN'?'为本游戏创建专用按键':'Create custom buttons for this game'));
-      assert.ok(createCustom,'new game retains a custom-configuration entry');
-      await act(async()=>{createCustom.props.onClick();customEditor=create(factory().props.pages[0].content)});
-      assert.ok(customEditor.root.findAllByType('PanelSection').some(x=>x.props.title===(language==='zh-CN'?'正在编辑：Game One':'Editing: Game One')));
-      assert.equal(customEditor.root.findByType('ToggleField').props.checked,true);
-      assert.equal(customEditor.root.findAllByType('DropdownItem').find(x=>x.props.label===(language==='zh-CN'?'左 M2':'Left M2')).props.selectedOption,'B');
-    }finally{await act(async()=>customEditor?.unmount());}
-
-
     const panelText=JSON.stringify(rendered.toJSON());
     const infoLabel=language==='zh-CN'?'当前按键：':'Current buttons: ';
     assert.ok(panelText.indexOf(infoLabel)<panelText.indexOf('\u203a'),'context precedes the action on screen');
@@ -300,8 +289,8 @@ for(const language of ['zh-CN','en-US']) test(`cards, copy dialog and duplicate 
       let fallback;
       try{
         await act(async()=>{fallback=create(factory().props.pages[0].content)});
-        assert.ok(fallback.root.findAllByType('PanelSection').some(x=>x.props.title===(zh?'正在编辑：Same':'Editing: Same')));
-        assert.equal(fallback.root.findAllByType('ToggleField').length,1);
+        assert.ok(fallback.root.findAllByType('PanelSection').some(x=>x.props.title===(zh?'正在编辑：默认按键':'Editing: Default buttons')));
+        assert.equal(fallback.root.findAllByType('ToggleField').length,0);
       }finally{await act(async()=>fallback?.unmount());}
     }finally{await act(async()=>unknown?.unmount());}
     state.game_known=true;
