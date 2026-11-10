@@ -57,6 +57,16 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       assert.ok(defaultEditor.root.findAllByType('PanelSection').some(x=>x.props.title===(language==='zh-CN'?'正在编辑：默认按键':'Editing: Default buttons')),
         'running game using defaults opens the displayed default configuration');
     }finally{await act(async()=>defaultEditor?.unmount());}
+    let customEditor;
+    try{
+      const createCustom=rendered.root.findAllByType('ButtonItem').find(x=>x.props.children===(language==='zh-CN'?'为本游戏创建专用按键':'Create custom buttons for this game'));
+      assert.ok(createCustom,'new game retains a custom-configuration entry');
+      await act(async()=>{createCustom.props.onClick();customEditor=create(factory().props.pages[0].content)});
+      assert.ok(customEditor.root.findAllByType('PanelSection').some(x=>x.props.title===(language==='zh-CN'?'正在编辑：Game One':'Editing: Game One')));
+      assert.equal(customEditor.root.findByType('ToggleField').props.checked,true);
+      assert.equal(customEditor.root.findAllByType('DropdownItem').find(x=>x.props.label===(language==='zh-CN'?'左 M2':'Left M2')).props.selectedOption,'B');
+    }finally{await act(async()=>customEditor?.unmount());}
+
 
     const panelText=JSON.stringify(rendered.toJSON());
     const infoLabel=language==='zh-CN'?'当前按键：':'Current buttons: ';
