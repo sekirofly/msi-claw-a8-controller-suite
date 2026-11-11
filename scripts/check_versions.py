@@ -4,7 +4,7 @@
 - ``plugin.json`` is what Decky displays,
 - ``installer.py`` decides which release tag it downloads,
 - ``install.sh`` pins the raw URL that fetches ``installer.py``,
-- the panel prints it in Maintenance.
+- the update panels display it in their headings.
 
 A disagreement in the last three breaks installation rather than display, so it
 must fail here instead of at a user's terminal.
@@ -33,7 +33,7 @@ def main():
         ('plugin.json', find(r'"version"\s*:\s*"([^"]+)"', 'plugin.json')),
         ('installer.py', find(r'^VERSION\s*=\s*"([^"]+)"', 'installer.py', re.MULTILINE)),
         ('install.sh', find(r'/v(\d+\.\d+\.\d+(?:-alpha\.\d+)?)/installer\.py', 'install.sh')),
-        ('src/index.tsx', find(r"'(\d+\.\d+\.\d+(?:-alpha\.\d+)?) · GPL", 'src/index.tsx')),
+        ('src/index.tsx', find(r"const VERSION = '(\d+\.\d+\.\d+(?:-alpha\.\d+)?)'", 'src/index.tsx')),
     ]
     failed = False
     for name, found in checks:

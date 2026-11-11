@@ -2,11 +2,37 @@
 from pathlib import Path
 import shutil
 import subprocess
-from installer import main
+import argparse
+import re
+import installer
+
+def run(argv=None):
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('--update-version')
+    options, remaining = parser.parse_known_args(argv)
+    original = installer.VERSION
+    try:
+        if options.update_version is not None:
+            version = options.update_version
+            if (not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version)
+                    or not remaining or remaining[0] != 'install'
+                    or '--reset-controller' in remaining):
+                raise ValueError('Invalid update request')
+            target = tuple(map(int, version.split('.')))
+            current = tuple(map(int, original.split('-')[0].split('.')))
+            if target < current or (target == current and '-alpha.' not in original):
+                raise ValueError('Update must select a newer stable release')
+            # A fresh independent process pins the existing verified download and
+            # rollback flow to the release the user explicitly confirmed.
+            installer.VERSION = version
+        installer.main(remaining)
+    finally:
+        installer.VERSION = original
+
 
 if __name__ == '__main__':
     try:
-        main()
+        run()
     except Exception:
         # Even a download failure must release the old plugin's pending state.
         # The independent job/journal retains the actual error for diagnosis.

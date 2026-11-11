@@ -130,26 +130,26 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       await act(async()=>{settings=create(hardwarePage)});
       // Both entry points remain idle until a click and share a single request/result.
       assert.equal(calls.filter(x=>x[0]==='check_update').length,0);
-      const updateButton=root=>root.findAllByType('ButtonItem').find(x=>
-        ['检查更新','Check for updates','正在检查…','Checking…'].includes(x.props.children));
+      const updateButton=root=>root.findAllByType('PanelSection').find(x=>/^插件更新|^Plugin updates/.test(String(x.props.title))).findAllByType('ButtonItem').find(x=>
+        ['检查更新','Check for updates','正在检查…','Checking…','重新检查','Check again','重试','Retry'].includes(x.props.children));
       const trigger=updateButton(rendered.root).props.onClick;
       await act(async()=>{trigger();trigger();updateButton(settings.root).props.onClick();});
       assert.deepEqual(calls.filter(x=>x[0]==='check_update'),[['check_update']]);
       assert.ok(updateButton(rendered.root).props.disabled&&updateButton(settings.root).props.disabled);
-      await act(async()=>{releaseUpdate({ok:true,data:{current:'0.1.5',latest:'0.1.6',available:true}});});
-      for(const root of [rendered,settings])assert.match(JSON.stringify(root.toJSON()),/0.1.6/);
-      const releases=settings.root.findAllByType('ButtonItem').find(x=>
-        ['前往仓库发布页','Open repository releases'].includes(x.props.children));
-      await act(async()=>{releases.props.onClick();});
-      assert.deepEqual(calls.filter(x=>x[0]==='open_external'),
-        [['open_external','https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest']]);
+      await act(async()=>{releaseUpdate({ok:true,data:{current:'0.1.6',latest:'0.1.7',available:true}});});
+      for(const root of [rendered,settings])assert.match(JSON.stringify(root.toJSON()),/0.1.7/);
+      const upgrade=root=>root.findAllByType('ButtonItem').find(x=>
+        ['更新到 v0.1.7','Update to v0.1.7'].includes(x.props.children));
+      await act(async()=>{upgrade(settings.root).props.onClick();});
+      assert.deepEqual(calls.filter(x=>x[0]==='maintenance'),[['maintenance','update','0.1.7']]);
+      assert.ok(upgrade(settings.root),'submission failure keeps update available for retry');
       await act(async()=>{updateButton(settings.root).props.onClick();});
       await act(async()=>{releaseUpdate({ok:false,error:'update_unavailable'});});
       assert.match(JSON.stringify(rendered.toJSON()),language==='zh-CN'?/检查失败/:/Check failed/);
       assert.ok(!updateButton(settings.root).props.disabled);
       await act(async()=>{updateButton(settings.root).props.onClick();});
-      await act(async()=>{releaseUpdate({ok:true,data:{current:'0.1.5',latest:'0.1.5',available:false}});});
-      assert.match(JSON.stringify(settings.toJSON()),language==='zh-CN'?/当前版本无需更新/:/No update needed/);
+      await act(async()=>{releaseUpdate({ok:true,data:{current:'0.1.6',latest:'0.1.6',available:false}});});
+      assert.match(JSON.stringify(settings.toJSON()),language==='zh-CN'?/已是最新版本/:/You are up to date/);
       assert.equal(settings.root.findAllByType('ButtonItem').filter(x=>
         ['前往仓库发布页','Open repository releases'].includes(x.props.children)).length,0);
       const text=JSON.stringify(settings.toJSON());
@@ -221,6 +221,13 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
           assert.ok(open());
         } finally {await act(async()=>editor?.unmount());}
       }
+      // Successful scheduling switches both entry points to one waiting message.
+      await act(async()=>{updateButton(rendered.root).props.onClick();});
+      await act(async()=>{releaseUpdate({ok:true,data:{current:'0.1.6',latest:'0.1.7',available:true}});});
+      const confirmUpdate=upgrade(rendered.root).props.onClick;
+      await act(async()=>{confirmUpdate();confirmUpdate();});
+      assert.equal(calls.filter(x=>x[0]==='maintenance'&&x[1]==='update').length,2,'duplicate confirmations schedule one update');
+      for(const root of [rendered,settings])assert.match(JSON.stringify(root.toJSON()),language==='zh-CN'?/正在更新，请等待 Decky 自动重启/:/Updating. Wait for Decky to restart/);
     } finally {await act(async()=>{settings?.unmount();navigation?.unmount()});}
   } finally {await act(async()=>rendered?.unmount());plugin.onDismount();}
 });
