@@ -36,6 +36,22 @@ const testRumble = callable<[], Result<boolean>>('test_rumble');
 const manage = callable<[boolean], Result<State>>('set_management');
 const maintenance = callable<[string], Result<boolean>>('maintenance');
 const reportGame = callable<[string | null, string], Result<unknown>>('report_game');
+type UpdateInfo = {current: string; latest: string; available: boolean};
+const fetchUpdate = callable<[], Result<UpdateInfo>>('check_update');
+let updateStatus: {checking: boolean; result?: UpdateInfo; failed?: boolean} = {checking: false};
+const updateListeners = new Set<() => void>();
+function publishUpdate(){updateListeners.forEach(fn=>fn());}
+async function checkUpdates(){
+  if(updateStatus.checking)return;
+  updateStatus={checking:true};publishUpdate();
+  try {
+    const response=await fetchUpdate();
+    if(!response.ok)throw new Error('update_unavailable');
+    updateStatus={checking:false,result:response.data};
+  }catch{updateStatus={checking:false,failed:true};}
+  publishUpdate();
+}
+
 const buttons = ['M2','M1','A','B','X','Y','LB','RB','LS','RS','Up','Down','Left','Right','Menu','View'];
 const keys = ['Space','Enter','Esc','Tab','LeftShift','LeftCtrl','LeftAlt', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
 const outputs = [...buttons, ...keys.map(k => 'key:Key'+k), 'mouse:Left','mouse:Right','mouse:Middle'];
@@ -133,6 +149,23 @@ function useController() {
 }
 type Controller = ReturnType<typeof useController>;
 const row = (text: string) => <PanelSectionRow key={text}><div style={{fontSize:13, overflowWrap:'anywhere'}}>{text}</div></PanelSectionRow>;
+function UpdatePanel(){
+  const [,render]=useState(0);
+  useEffect(()=>{const listener=()=>render(value=>value+1);updateListeners.add(listener);return()=>{updateListeners.delete(listener);};},[]);
+  const {checking,result,failed}=updateStatus;
+  return <PanelSection title={t('插件更新','Plugin updates')}>
+    {result&&row(result.available
+      ?t('发现新版本：v','New version available: v')+result.latest+t('（当前 v',' (current v')+result.current+t('）。请前往仓库安装。','). Visit the repository to install it.')
+      :t('当前版本无需更新：v','No update needed for the current version: v')+result.current)}
+    {failed&&row(t('检查失败，请检查网络后重试，或直接查看仓库发布页。','Check failed. Check your connection and retry, or visit the repository releases page.'))}
+    <PanelSectionRow><ButtonItem layout="below" disabled={checking} onClick={()=>void checkUpdates()}>
+      {checking?t('正在检查…','Checking…'):t('检查更新','Check for updates')}
+    </ButtonItem></PanelSectionRow>
+    {(result?.available||failed)&&<PanelSectionRow><ButtonItem layout="below" onClick={()=>Navigation.NavigateToExternalWeb('https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest')}>
+      {t('前往仓库发布页','Open repository releases')}
+    </ButtonItem></PanelSectionRow>}
+  </PanelSection>;
+}
 function confirm(title: string, description: string, action: () => void) {
   showModal(<ConfirmModal strTitle={title} strDescription={description} strOKButtonText={t('确认','Confirm')}
     strCancelButtonText={t('取消','Cancel')} onOK={action}/>);
@@ -375,7 +408,7 @@ function QuickPanel() {
       onClick={()=>open(game??'default',game?s.game_name:t('默认按键','Default buttons'))}>
       {game?(s.config.games[game]?t('编辑本游戏专用按键','Edit this game’s custom buttons'):t('为本游戏创建专用按键','Create custom buttons for this game')):t('编辑默认按键','Edit default buttons')}
     </ButtonItem></PanelSectionRow>
-  </PanelSection>}<RumblePanel c={c}/></>;
+  </PanelSection>}<RumblePanel c={c}/><UpdatePanel/></>;
 }
 
 function Settings({page}:{page:'configs'|'hardware'|'about'}) {
@@ -422,9 +455,10 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
     </>}
     {page==='about'&&<>
       <PanelSection>
-        {row('0.1.4 · GPL-3.0-only')}
+        {row('0.1.5 · GPL-3.0-only')}
         {row('https://github.com/sekirofly/msi-claw-a8-controller-suite')}
       </PanelSection>
+      <UpdatePanel/>
       <PanelSection title={t('插件管理','Plugin management')}>
         {row(s.managed
           ? t('管理已启用 · Xbox Elite','Management enabled · Xbox Elite')

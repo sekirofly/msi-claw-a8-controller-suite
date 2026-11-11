@@ -23,16 +23,17 @@ function loadMonitor(){
 
 for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble ordering: ${language}`,async()=>{
   Object.defineProperty(global,'navigator',{value:{language},configurable:true});
-  const calls=[];let factory;let release;let failSave=false;let failMaintenance=true;
+  const calls=[];let factory;let release;let failSave=false;let failMaintenance=true;let releaseUpdate;
   const hardware={mode:'macro',left:50,right:50};
   const state={config:{revision:0,default:{M2:['B'],M1:[]},games:{}},game:'1',game_name:'Game One',
     applied:'default',managed:true,paused:false,hardware,can_test:true,inputplumber:{sources:['M1','M2']}};
-  const ui={Router:{MainRunningApp:{appid:1,display_name:'Game One'}},Navigation:{Navigate(){},CloseSideMenus(){}},showModal(el){el?.props?.onOK?.()}};
+  const ui={Router:{MainRunningApp:{appid:1,display_name:'Game One'}},Navigation:{Navigate(){},CloseSideMenus(){},NavigateToExternalWeb(url){calls.push(['open_external',url])}},showModal(el){el?.props?.onOK?.()}};
   for(const n of ['ButtonItem','PanelSection','PanelSectionRow','SliderField','ToggleField','DropdownItem','TextField','ConfirmModal','SidebarNavigation','Focusable','DialogButton'])
     ui[n]=props=>React.createElement(n,props,props.children);
   const api={definePlugin:f=>f,routerHook:{addRoute:(_,f)=>{factory=f},removeRoute(){}},callable:name=>async(...args)=>{
     calls.push([name,...args]);
     if(name==='set_hardware') {await new Promise(r=>{release=r});if(failSave)return {ok:false,error:'readback_failed'};hardware.left=args[1];hardware.right=args[2];return {ok:true,data:hardware};}
+    if(name==='check_update')return await new Promise(resolve=>{releaseUpdate=resolve});
     if(name==='maintenance')return failMaintenance?{ok:false,error:'operation_failed'}:{ok:true,data:true};
     if(name==='get_state')return {ok:true,data:JSON.parse(JSON.stringify(state))};
     if(name==='set_management') {state.managed=args[0];state.apply_error=null;return {ok:true,data:state};}
@@ -127,6 +128,30 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       await act(async()=>{navigation=create(factory())});
       const hardwarePage=navigation.root.findByType('SidebarNavigation').props.pages[2].content;
       await act(async()=>{settings=create(hardwarePage)});
+      // Both entry points remain idle until a click and share a single request/result.
+      assert.equal(calls.filter(x=>x[0]==='check_update').length,0);
+      const updateButton=root=>root.findAllByType('ButtonItem').find(x=>
+        ['检查更新','Check for updates','正在检查…','Checking…'].includes(x.props.children));
+      const trigger=updateButton(rendered.root).props.onClick;
+      await act(async()=>{trigger();trigger();updateButton(settings.root).props.onClick();});
+      assert.deepEqual(calls.filter(x=>x[0]==='check_update'),[['check_update']]);
+      assert.ok(updateButton(rendered.root).props.disabled&&updateButton(settings.root).props.disabled);
+      await act(async()=>{releaseUpdate({ok:true,data:{current:'0.1.5',latest:'0.1.6',available:true}});});
+      for(const root of [rendered,settings])assert.match(JSON.stringify(root.toJSON()),/0.1.6/);
+      const releases=settings.root.findAllByType('ButtonItem').find(x=>
+        ['前往仓库发布页','Open repository releases'].includes(x.props.children));
+      await act(async()=>{releases.props.onClick();});
+      assert.deepEqual(calls.filter(x=>x[0]==='open_external'),
+        [['open_external','https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest']]);
+      await act(async()=>{updateButton(settings.root).props.onClick();});
+      await act(async()=>{releaseUpdate({ok:false,error:'update_unavailable'});});
+      assert.match(JSON.stringify(rendered.toJSON()),language==='zh-CN'?/检查失败/:/Check failed/);
+      assert.ok(!updateButton(settings.root).props.disabled);
+      await act(async()=>{updateButton(settings.root).props.onClick();});
+      await act(async()=>{releaseUpdate({ok:true,data:{current:'0.1.5',latest:'0.1.5',available:false}});});
+      assert.match(JSON.stringify(settings.toJSON()),language==='zh-CN'?/当前版本无需更新/:/No update needed/);
+      assert.equal(settings.root.findAllByType('ButtonItem').filter(x=>
+        ['前往仓库发布页','Open repository releases'].includes(x.props.children)).length,0);
       const text=JSON.stringify(settings.toJSON());
       assert.doesNotMatch(text,/MSI Claw A8 Controller Suite/,'outer navigation owns the plugin title');
       assert.doesNotMatch(text,/请恢复后重新启用|Restore before enabling again/);

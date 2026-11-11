@@ -1,6 +1,7 @@
 """Decky entry point. One serialized backend owns all mutations."""
 import asyncio
 import collections
+import json
 import logging
 import os
 from pathlib import Path
@@ -258,6 +259,15 @@ class Plugin:
                 await asyncio.wait_for(self.stopping.wait(), timeout=2)
             except asyncio.TimeoutError:
                 pass
+
+    async def check_update(self):
+        # Network access is explicit and independent of the controller write lock.
+        from backend.updates import check_latest
+        try:
+            current = json.loads((Path(__file__).resolve().parent / 'package.json').read_text())['version']
+            return {'ok': True, 'data': await asyncio.to_thread(check_latest, current)}
+        except Exception:
+            return {'ok': False, 'error': 'update_unavailable'}
 
     async def maintenance(self, action):
         def schedule():
