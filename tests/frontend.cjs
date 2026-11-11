@@ -130,6 +130,7 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       await act(async()=>{settings=create(hardwarePage)});
       // Both entry points remain idle until a click and share a single request/result.
       assert.equal(calls.filter(x=>x[0]==='check_update').length,0);
+      assert.doesNotMatch(JSON.stringify(settings.toJSON()),/上次检查：|Last checked:/);
       const updateButton=root=>root.findAllByType('PanelSection').find(x=>/^插件更新|^Plugin updates/.test(String(x.props.title))).findAllByType('ButtonItem').find(x=>
         ['检查更新','Check for updates','正在检查…','Checking…','重新检查','Check again','重试','Retry'].includes(x.props.children));
       const trigger=updateButton(rendered.root).props.onClick;
@@ -138,6 +139,9 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       assert.ok(updateButton(rendered.root).props.disabled&&updateButton(settings.root).props.disabled);
       await act(async()=>{releaseUpdate({ok:true,data:{current:'0.1.6',latest:'0.1.7',available:true}});});
       for(const root of [rendered,settings])assert.match(JSON.stringify(root.toJSON()),/0.1.7/);
+      const timestamp=root=>JSON.stringify(root.toJSON()).match(language==='zh-CN'?/上次检查：[0-9]{2}:[0-9]{2}/:/Last checked: [0-9]{2}:[0-9]{2}/)?.[0];
+      assert.ok(timestamp(rendered));
+      assert.equal(timestamp(rendered),timestamp(settings),'both entry points share the completed-check time');
       const upgrade=root=>root.findAllByType('ButtonItem').find(x=>
         ['更新到 v0.1.7','Update to v0.1.7'].includes(x.props.children));
       await act(async()=>{upgrade(settings.root).props.onClick();});

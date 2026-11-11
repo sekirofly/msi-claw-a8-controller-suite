@@ -5,7 +5,7 @@ import {callable, definePlugin, routerHook} from '@decky/api';
 
 import {monitorGame} from './game-monitor';
 
-const VERSION = '0.1.7';
+const VERSION = '0.1.8';
 const route = '/msi-claw-a8-controller-suite';
 const t = (zh: string, en: string) => /^zh(?:[-_]|$)/i.test(navigator.language) ? zh : en;
 type Rules = Record<string, string[]>;
@@ -40,7 +40,7 @@ const reportGame = callable<[string | null, string], Result<unknown>>('report_ga
 type UpdateInfo = {current: string; latest: string; available: boolean};
 type UpdateFailure = {api: string; fallback: string};
 const fetchUpdate = callable<[], Result<UpdateInfo>&{failure?:UpdateFailure}>('check_update');
-let updateStatus: {checking: boolean; result?: UpdateInfo; failed?: boolean; failure?: UpdateFailure; updating?: boolean; installError?: string} = {checking: false};
+let updateStatus: {checking: boolean; result?: UpdateInfo; failed?: boolean; checkedAt?: number; failure?: UpdateFailure; updating?: boolean; installError?: string} = {checking: false};
 const updateListeners = new Set<() => void>();
 function publishUpdate(){updateListeners.forEach(fn=>fn());}
 async function checkUpdates(){
@@ -48,10 +48,10 @@ async function checkUpdates(){
   updateStatus={checking:true};publishUpdate();
   try {
     const response=await fetchUpdate();
-    if(!response.ok){updateStatus={...updateStatus,checking:false,failed:true,failure:response.failure};publishUpdate();return;}
-    updateStatus={...updateStatus,checking:false,result:response.data,failed:undefined};
+    if(!response.ok)updateStatus={...updateStatus,checking:false,failed:true,failure:response.failure};
+    else updateStatus={...updateStatus,checking:false,result:response.data,failed:undefined};
   }catch{updateStatus={...updateStatus,checking:false,failed:true};}
-  publishUpdate();
+  updateStatus={...updateStatus,checkedAt:Date.now()};publishUpdate();
 }
 
 const buttons = ['M2','M1','A','B','X','Y','LB','RB','LS','RS','Up','Down','Left','Right','Menu','View'];
@@ -176,7 +176,7 @@ function updateFailureText(code:string){
   return messages[code]?t(...messages[code]):code;
 }
 function UpdatePanel({disabled=false}:{disabled?:boolean}){
-  const {checking,result,failed,failure,updating,installError}=useUpdateStatus();
+  const {checking,result,failed,checkedAt,failure,updating,installError}=useUpdateStatus();
   return <PanelSection title={t('插件更新','Plugin updates')+' · v'+VERSION}>
     {updating?row(t('正在更新，请等待 Decky 自动重启，暂时不要操作。','Updating. Wait for Decky to restart; avoid operating the plugin.')):<>
       {result&&row(result.available
@@ -185,6 +185,7 @@ function UpdatePanel({disabled=false}:{disabled?:boolean}){
       {failed&&row(t('检查失败。','Check failed.')+(failure
         ?' GitHub API: '+updateFailureText(failure.api)+t('；发布页：','; release page: ')+updateFailureText(failure.fallback)
         :t('请重试；若持续失败，请查看 Decky 日志。',' Retry; if this persists, check Decky logs.')))}
+      {checkedAt!==undefined&&row(t('上次检查：','Last checked: ')+new Date(checkedAt).toLocaleTimeString(navigator.language,{hour:'2-digit',minute:'2-digit',hour12:false}))}
       {installError&&row(installError)}
       {result?.available&&<PanelSectionRow><ButtonItem layout="below" disabled={disabled||checking} onClick={()=>confirm(
         t('更新到 v','Update to v')+result.latest+'?',
@@ -282,10 +283,11 @@ function RumblePanel({c,shared=true}: {c: Controller; shared?: boolean}) {
       })();
     }}>{testing?t('测试中…','Testing…'):t('测试震动 · 0.5 秒','Test rumble · 0.5 seconds')}</ButtonItem></PanelSectionRow>
     {result?.state==='running'&&row(t('正在发送震动…','Sending the pulse…'))}
-    {result?.state==='ok'&&row(t('上次测试：已向内置手柄发送 0.5 秒效果。','Last test: a 0.5 second effect was sent to the embedded controller.'))}
     {result?.state==='error'&&row(t('上次测试失败：','Last test failed: ')
       +(result.code&&result.code!=='operation_failed'?errorText(result.code):(result.detail||result.code||'')))}
-    {row(error || (saving?t('正在保存…','Saving…'):t('滑动自动保存；测试只触发内置手柄。','Changes save automatically; testing targets only the embedded controller.')))}
+    {row(error || (saving?t('正在保存…','Saving…'):result?.state==='ok'
+      ?t('已发送 0.5 秒测试；滑动自动保存。','Sent a 0.5-second test; changes save automatically.')
+      :t('滑动自动保存；测试仅作用于内置手柄。','Changes save automatically; testing targets only the embedded controller.')))}
     {!c.state?.can_test && row(t('此设备的震动测试接口尚不可用','Rumble test interface is unavailable on this device'))}
   </PanelSection>;
 }
@@ -316,7 +318,7 @@ const mappingGroups = [
 ];
 // Keep firmware identifiers visible; descriptions explain when to use each mode.
 const MODES = [
-  {key:'macro', zh:'Macro（宏）', en:'Macro', detailZh:'SteamOS 推荐，用于本套件的左右背键映射；插件不提供宏录制。', detailEn:'Recommended on SteamOS for this suite’s back-button mappings; the plugin does not record macros.'},
+  {key:'macro', zh:'Macro（宏）', en:'Macro', detailZh:'用于左右背键映射；不提供宏录制。', detailEn:'For left/right back-button mappings; macro recording is not supported.'},
   {key:'combination', zh:'Combination（组合键）', en:'Combination', detailZh:'用于 Windows 下的背键组合快捷操作。', detailEn:'For back-button combination shortcuts on Windows.'},
   {key:'disabled', zh:'Disabled（禁用）', en:'Disabled', detailZh:'禁用背键硬件功能。', detailEn:'Disable the hardware back-button function.'},
 ] as const;
@@ -501,7 +503,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         <PanelSectionRow><ButtonItem layout="below" disabled={c.busy} onClick={()=>{
           if(!s.managed){void c.run(()=>enqueue(()=>manage(true)));return;}
           confirm(t('恢复系统默认并停用管理？','Restore system defaults and disable management?'),
-            t('内置手柄的输出和按键映射将恢复为本机系统默认，不恢复旧插件的自定义配置。此后保持停用，直到再次启用。背键硬件模式和震动不变。','Restore the installed system defaults, not another plugin’s custom configuration. Management stays disabled until you enable it again. Hardware back-button mode and rumble stay unchanged.'),
+            t('恢复系统默认按键与输出，保持停用直到再次启用。背键模式和震动强度不变。','Restore system-default mappings and output, and keep management disabled until enabled again. Back-button mode and rumble strengths stay unchanged.'),
             ()=>void c.run(()=>enqueue(()=>manage(false))));
         }}>{s.managed?t('恢复系统默认并停用','Restore system defaults and disable'):t('启用管理','Enable management')}</ButtonItem></PanelSectionRow>
       </PanelSection>

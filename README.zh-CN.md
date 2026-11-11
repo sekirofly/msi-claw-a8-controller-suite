@@ -41,7 +41,18 @@ MSI Claw A8（BZ2EM / MS-1T8K）内置手柄的 Decky 插件。本项目非 MSI 
 curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/main/install-latest.sh | bash
 ```
 
-安装器校验发行包 SHA-256 并重启 Decky。覆盖更新保留按键方案和管理选择，不自动重置手柄。保存工作并重启掌机后检查插件状态；安装成功不等于配置已应用。自定义 Decky 目录使用 `bash -s -- install --decky-home /绝对路径/homebrew`。
+更新保留按键方案和管理选择。安装完成后，请保存工作并重启掌机。
+
+<details>
+<summary>高级选项：自定义 Decky 目录</summary>
+
+默认 Decky 目录为 `~/homebrew`。只有 Decky 安装在其他位置时才需要指定实际目录；将下方示例路径替换为你的 Decky 目录。
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/main/install-latest.sh | bash -s -- install --decky-home /绝对路径/homebrew
+```
+
+</details>
 
 ### 离线安装
 
