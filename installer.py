@@ -15,7 +15,7 @@ import urllib.error
 import time
 import zipfile
 
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 REPO = "https://github.com/sekirofly/msi-claw-a8-controller-suite"
 NAME = "MSI Claw A8 Controller Suite"
 FOLDER = "msi-claw-a8-controller-suite"
@@ -243,14 +243,14 @@ def transact(home, action, staged=None, skip_restore=False, reset_controller=Fal
         raise ValueError('Plugin files installed, but controller reset failed. Decky restarted. ' + reset_error)
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['install', 'reinstall', 'uninstall'], nargs='?', default='install')
     parser.add_argument('--decky-home', default=str(Path.home() / 'homebrew'))
     parser.add_argument('--skip-restore', action='store_true',
                         help='skip restoring system defaults during uninstall')
     parser.add_argument('--reset-controller', action='store_true', help='reset the internal A8 controller after installation; requires handheld reboot')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.reset_controller and args.action == 'uninstall':
         parser.error('--reset-controller is not an uninstall option')
     home = validate_home(args.decky_home)

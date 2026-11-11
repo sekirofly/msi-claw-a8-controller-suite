@@ -5,6 +5,7 @@ import {callable, definePlugin, routerHook} from '@decky/api';
 
 import {monitorGame} from './game-monitor';
 
+const VERSION = '0.1.6';
 const route = '/msi-claw-a8-controller-suite';
 const t = (zh: string, en: string) => /^zh(?:[-_]|$)/i.test(navigator.language) ? zh : en;
 type Rules = Record<string, string[]>;
@@ -34,21 +35,21 @@ const deleteConfig = callable<[string, number], Result<State>>('delete_config');
 const setHardware = callable<[string | null, number | null, number | null], Result<State['hardware']>>('set_hardware');
 const testRumble = callable<[], Result<boolean>>('test_rumble');
 const manage = callable<[boolean], Result<State>>('set_management');
-const maintenance = callable<[string], Result<boolean>>('maintenance');
+const maintenance = callable<[string, string?], Result<boolean>>('maintenance');
 const reportGame = callable<[string | null, string], Result<unknown>>('report_game');
 type UpdateInfo = {current: string; latest: string; available: boolean};
 const fetchUpdate = callable<[], Result<UpdateInfo>>('check_update');
-let updateStatus: {checking: boolean; result?: UpdateInfo; failed?: boolean} = {checking: false};
+let updateStatus: {checking: boolean; result?: UpdateInfo; failed?: boolean; updating?: boolean; installError?: string} = {checking: false};
 const updateListeners = new Set<() => void>();
 function publishUpdate(){updateListeners.forEach(fn=>fn());}
 async function checkUpdates(){
-  if(updateStatus.checking)return;
+  if(updateStatus.checking||updateStatus.updating)return;
   updateStatus={checking:true};publishUpdate();
   try {
     const response=await fetchUpdate();
     if(!response.ok)throw new Error('update_unavailable');
-    updateStatus={checking:false,result:response.data};
-  }catch{updateStatus={checking:false,failed:true};}
+    updateStatus={...updateStatus,checking:false,result:response.data,failed:undefined};
+  }catch{updateStatus={...updateStatus,checking:false,failed:true};}
   publishUpdate();
 }
 
@@ -149,21 +150,36 @@ function useController() {
 }
 type Controller = ReturnType<typeof useController>;
 const row = (text: string) => <PanelSectionRow key={text}><div style={{fontSize:13, overflowWrap:'anywhere'}}>{text}</div></PanelSectionRow>;
-function UpdatePanel(){
+function useUpdateStatus(){
   const [,render]=useState(0);
   useEffect(()=>{const listener=()=>render(value=>value+1);updateListeners.add(listener);return()=>{updateListeners.delete(listener);};},[]);
-  const {checking,result,failed}=updateStatus;
-  return <PanelSection title={t('插件更新','Plugin updates')}>
-    {result&&row(result.available
-      ?t('发现新版本：v','New version available: v')+result.latest+t('（当前 v',' (current v')+result.current+t('）。请前往仓库安装。','). Visit the repository to install it.')
-      :t('当前版本无需更新：v','No update needed for the current version: v')+result.current)}
-    {failed&&row(t('检查失败，请检查网络后重试，或直接查看仓库发布页。','Check failed. Check your connection and retry, or visit the repository releases page.'))}
-    <PanelSectionRow><ButtonItem layout="below" disabled={checking} onClick={()=>void checkUpdates()}>
-      {checking?t('正在检查…','Checking…'):t('检查更新','Check for updates')}
-    </ButtonItem></PanelSectionRow>
-    {(result?.available||failed)&&<PanelSectionRow><ButtonItem layout="below" onClick={()=>Navigation.NavigateToExternalWeb('https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest')}>
-      {t('前往仓库发布页','Open repository releases')}
-    </ButtonItem></PanelSectionRow>}
+  return updateStatus;
+}
+async function installUpdate(version:string){
+  if(updateStatus.updating)return;
+  updateStatus={...updateStatus,updating:true,installError:undefined};publishUpdate();
+  try {await flushRumble();await enqueue(()=>maintenance('update',version));}
+  catch(e){updateStatus={...updateStatus,updating:false,installError:String(e)};publishUpdate();}
+}
+function UpdatePanel({disabled=false}:{disabled?:boolean}){
+  const {checking,result,failed,updating,installError}=useUpdateStatus();
+  return <PanelSection title={t('插件更新','Plugin updates')+' · v'+VERSION}>
+    {updating?row(t('正在更新，请等待 Decky 自动重启，暂时不要操作。','Updating. Wait for Decky to restart; avoid operating the plugin.')):<>
+      {result&&row(result.available
+        ?t('发现新版本：v','New version available: v')+result.latest
+        :t('已是最新版本','You are up to date'))}
+      {failed&&row(t('检查失败，请检查网络后重试。','Check failed. Check your connection and retry.'))}
+      {installError&&row(installError)}
+      {result?.available&&<PanelSectionRow><ButtonItem layout="below" disabled={disabled||checking} onClick={()=>confirm(
+        t('更新到 v','Update to v')+result.latest+'?',
+        t('保留全部按键方案和管理选择，不重置手柄。确认后请等待 Decky 自动重启；完成后建议保存工作并重启掌机。','Keep all mappings and the management preference without resetting the controller. After confirming, wait for Decky to restart. Save work and reboot the handheld afterward.'),
+        ()=>void installUpdate(result.latest))}>
+        {t('更新到 v','Update to v')+result.latest}
+      </ButtonItem></PanelSectionRow>}
+      <PanelSectionRow><ButtonItem layout="below" disabled={disabled||checking} onClick={()=>void checkUpdates()}>
+        {checking?t('正在检查…','Checking…'):failed?t('重试','Retry'):result?t('重新检查','Check again'):t('检查更新','Check for updates')}
+      </ButtonItem></PanelSectionRow>
+    </>}
   </PanelSection>;
 }
 function confirm(title: string, description: string, action: () => void) {
@@ -415,6 +431,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
   const c=useController();const s=c.state;
   const [editing,setEditing]=useState<{scope:string;name:string}|undefined>(()=>{const req=requestedScope;requestedScope=undefined;return page==='configs'?req:undefined;});
   const returnTo=useRef<string|undefined>(undefined);
+  const updateState=useUpdateStatus();
   const [maintenancePending,setMaintenancePending]=useState(false);
   const [maintenanceError,setMaintenanceError]=useState('');
   async function startMaintenance(action:string) {
@@ -455,10 +472,9 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
     </>}
     {page==='about'&&<>
       <PanelSection>
-        {row('0.1.5 · GPL-3.0-only')}
         {row('https://github.com/sekirofly/msi-claw-a8-controller-suite')}
       </PanelSection>
-      <UpdatePanel/>
+      <UpdatePanel disabled={maintenancePending||c.busy}/>
       <PanelSection title={t('插件管理','Plugin management')}>
         {row(s.managed
           ? t('管理已启用 · Xbox Elite','Management enabled · Xbox Elite')
@@ -477,7 +493,7 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
         {row(t('震动消失时，先用“修复插件与手柄”软件重置手柄，再重启掌机；若仍未恢复，再参考 MSI 官方说明手动重置 EC。','If rumble stops working, use Repair plugin and controller to reset the controller, then reboot the handheld. If the issue persists, follow MSI’s official instructions for a manual EC reset.'))}
         {maintenancePending&&row(t('正在维护，请等待 Decky 自动重启，暂时不要操作。','Maintenance in progress. Wait for Decky to restart; avoid operating the plugin.'))}
         {maintenanceError&&row(maintenanceError)}
-        {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem layout="below" disabled={c.busy||maintenancePending} onClick={()=>confirm(
+        {(['install','reinstall','uninstall'] as const).map(action=><PanelSectionRow key={action}><ButtonItem layout="below" disabled={c.busy||maintenancePending||updateState.updating} onClick={()=>confirm(
           action==='uninstall'?t('干净卸载插件','Clean uninstall'):action==='reinstall'?t('清除配置并重新安装','Clear configurations and reinstall'):t('修复插件与手柄','Repair plugin and controller'),
           action==='uninstall'?t('卸载前恢复系统默认。确认后请等待 Decky 自动重启。','Restore system defaults before removal. After confirming, wait for Decky to restart.'):
             (action==='reinstall'?t('将删除默认按键和全部游戏专用方案。','Deletes default mappings and all game-specific configurations.'):t('保留全部按键方案，重新安装当前版本。','Retains all mappings and reinstalls the current version.'))+' '+

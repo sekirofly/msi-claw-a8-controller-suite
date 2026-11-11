@@ -30,6 +30,44 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, {'ok': False, 'error': 'update_unavailable'})
         self.assertEqual(self.applied, [])
 
+    async def test_update_schedules_pinned_install_without_controller_reset(self):
+        import json
+        import os
+        import shutil
+        import subprocess
+        import main
+        home = Path(self.tmp.name) / 'homebrew'
+        root = home / 'plugins' / 'msi-claw-a8-controller-suite'
+        root.mkdir(parents=True)
+        source = Path(main.__file__).parent
+        for name in ('installer.py', 'maintenance_runner.py', 'plugin.json'):
+            shutil.copyfile(source / name, root / name)
+        settings = home / 'settings' / 'msi-claw-a8-controller-suite'
+        settings.mkdir(parents=True)
+        job = Path(self.tmp.name) / 'job'
+        job.mkdir()
+        env = {'DECKY_HOME': str(home), 'DECKY_PLUGIN_SETTINGS_DIR': str(settings)}
+        with patch.dict(os.environ, env), patch('main.__file__', str(root / 'main.py')), \
+             patch('tempfile.mkdtemp', return_value=str(job)), \
+             patch('subprocess.run', return_value=subprocess.CompletedProcess([], 0)) as launch:
+            result = await self.plugin.maintenance('update', '9.8.7')
+        self.assertTrue(result['ok'], result)
+        args = launch.call_args.args[0]
+        self.assertEqual(args[-5:], ['install', '--decky-home', str(home), '--update-version', '9.8.7'])
+        self.assertNotIn('--reset-controller', args)
+        self.assertTrue(self.plugin.maintaining)
+        self.assertEqual(self.applied, [])
+        self.assertEqual(json.loads((root / 'plugin.json').read_text())['name'], 'MSI Claw A8 Controller Suite')
+
+    async def test_update_rejects_invalid_or_nonnewer_release_before_launch(self):
+        import subprocess
+        for version in (None, '../main', '0.0.1', '9.8.7-alpha.1'):
+            with self.subTest(version=version), patch.object(subprocess, 'run') as launch:
+                result = await self.plugin.maintenance('update', version)
+                self.assertEqual(result['error'], 'invalid_rules')
+                launch.assert_not_called()
+                self.assertFalse(self.plugin.maintaining)
+
     async def test_status_reuses_one_fresh_hardware_discovery(self):
         identity = {'usb': 'internal', 'events': []}
         self.plugin.ip = SimpleNamespace(enabled=True, ready=True, restore_pending=False,

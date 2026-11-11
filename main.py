@@ -269,9 +269,9 @@ class Plugin:
         except Exception:
             return {'ok': False, 'error': 'update_unavailable'}
 
-    async def maintenance(self, action):
+    async def maintenance(self, action, version=None):
         def schedule():
-            if action not in ('install', 'reinstall', 'uninstall'):
+            if action not in ('install', 'reinstall', 'uninstall', 'update'):
                 raise SuiteError('invalid_rules')
             import shutil
             import subprocess
@@ -281,6 +281,12 @@ class Plugin:
             spec = importlib.util.spec_from_file_location('suite_installer', root / 'installer.py')
             installer = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(installer)
+            if action == 'update':
+                import re
+                from backend.updates import version_key
+                if (not isinstance(version, str) or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version)
+                        or version_key(version) <= version_key(installer.VERSION)):
+                    raise SuiteError('invalid_rules')
             home = installer.validate_home(os.environ['DECKY_HOME'])
             if root != home / 'plugins' / installer.FOLDER:
                 raise SuiteError('nonstandard_install')
@@ -292,8 +298,9 @@ class Plugin:
                     shutil.copyfile(root / name, directory / name)
                 subprocess.run(['systemd-run', '--unit=msi-claw-a8-controller-suite-maintenance', '--on-active=3s',
                                 '--collect', '/usr/bin/python3', str(directory / 'maintenance_runner.py'),
-                                action, '--decky-home', str(home),
-                                *(['--reset-controller'] if action != 'uninstall' else [])], check=True, capture_output=True, text=True, timeout=15)
+                                'install' if action == 'update' else action, '--decky-home', str(home),
+                                *(['--update-version', version] if action == 'update' else
+                                  ['--reset-controller'] if action != 'uninstall' else [])], check=True, capture_output=True, text=True, timeout=15)
             except Exception:
                 shutil.rmtree(directory)
                 raise

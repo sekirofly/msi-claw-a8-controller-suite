@@ -23,7 +23,7 @@ Simulated previews rendered from the plugin's UI components with sample data. St
 - **Rumble adjustment and testing:** adjust left and right rumble strengths separately and send a short test pulse to the built-in controller. Changes save automatically and apply across games.
 - **Back-button hardware modes:** switch between Macro, Combination and Disabled. Macro is recommended on SteamOS; Combination provides back-button shortcuts on Windows.
 - **Rumble repair:** use Repair plugin and controller to reinstall the plugin and software-reset the built-in controller while keeping your mappings. Reboot the handheld afterward to complete recovery.
-- **Manual update checks:** check for the latest stable release from the bottom of the home panel or the top of Maintenance & About. If an update is available, open the repository to install it. There are no background update checks.
+- **Update checks and one-click updates:** manually check for the latest stable release from the home panel or Maintenance & About, then confirm an update in place. Updates preserve configurations, restart Decky and do not reset the controller. There are no background update checks.
 
 Management is enabled on first install. Restore system defaults and disable returns the built-in controller to the system's default configuration and keeps management disabled until you enable it again. External controllers are unaffected.
 
