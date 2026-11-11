@@ -421,7 +421,10 @@ function Settings({page}:{page:'configs'|'hardware'|'about'}) {
       <RumblePanel c={c} shared={false}/>
     </>}
     {page==='about'&&<>
-      <PanelSection>{row('0.1.3 · GPL-3.0-only')}</PanelSection>
+      <PanelSection>
+        {row('0.1.4 · GPL-3.0-only')}
+        {row('https://github.com/sekirofly/msi-claw-a8-controller-suite')}
+      </PanelSection>
       <PanelSection title={t('插件管理','Plugin management')}>
         {row(s.managed
           ? t('管理已启用 · Xbox Elite','Management enabled · Xbox Elite')

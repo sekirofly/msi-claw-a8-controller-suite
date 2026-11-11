@@ -49,7 +49,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck && pnpm run build
       - run: node --test tests/frontend.cjs
-      - run: bash -n install.sh
+      - run: bash -n install-latest.sh && bash -n install.sh
       - run: bash -n diagnostics.sh
       - run: python scripts/package.py
       - run: python scripts/verify_package.py

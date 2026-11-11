@@ -32,10 +32,12 @@ Management is enabled on first install. Restore system defaults and disable retu
 
 ### Online installation
 
+This fixed command installs or updates to the latest published stable release.
+
 Run as your normal desktop user in SteamOS Konsole:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.3/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/main/install-latest.sh | bash
 ```
 
 The installer verifies the release SHA-256 and restarts Decky. Updates retain mappings and management preference without resetting the controller. Save work, reboot the handheld and check plugin status. Installation completion does not confirm that mappings were applied. For a custom Decky home, use `bash -s -- install --decky-home /absolute/homebrew`.
@@ -79,9 +81,9 @@ Terminal alternatives (`reinstall` clears mappings but retains the management ch
 
 ```sh
 # Clear mappings, reinstall and reset controller; reboot afterward
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.3/install.sh | bash -s -- reinstall --reset-controller
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/main/install-latest.sh | bash -s -- reinstall --reset-controller
 # Uninstall
-curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/v0.1.3/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/main/install-latest.sh | bash -s -- uninstall
 # Offline uninstall using installed files
 python3 ~/homebrew/plugins/msi-claw-a8-controller-suite/installer.py uninstall
 ```
