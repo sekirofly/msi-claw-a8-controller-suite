@@ -144,8 +144,10 @@ for(const language of ['zh-CN','en-US']) test(`quick panel scope and rumble orde
       assert.deepEqual(calls.filter(x=>x[0]==='maintenance'),[['maintenance','update','0.1.7']]);
       assert.ok(upgrade(settings.root),'submission failure keeps update available for retry');
       await act(async()=>{updateButton(settings.root).props.onClick();});
-      await act(async()=>{releaseUpdate({ok:false,error:'update_unavailable'});});
+      await act(async()=>{releaseUpdate({ok:false,error:'update_unavailable',failure:{api:'http_403',fallback:'timeout'}});});
       assert.match(JSON.stringify(rendered.toJSON()),language==='zh-CN'?/检查失败/:/Check failed/);
+      assert.match(JSON.stringify(rendered.toJSON()),/HTTP 403/);
+      assert.match(JSON.stringify(rendered.toJSON()),language==='zh-CN'?/请求超时/:/Request timed out/);
       assert.ok(!updateButton(settings.root).props.disabled);
       await act(async()=>{updateButton(settings.root).props.onClick();});
       await act(async()=>{releaseUpdate({ok:true,data:{current:'0.1.6',latest:'0.1.6',available:false}});});

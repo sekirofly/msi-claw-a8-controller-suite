@@ -262,12 +262,17 @@ class Plugin:
 
     async def check_update(self):
         # Network access is explicit and independent of the controller write lock.
-        from backend.updates import check_latest
+        from backend.updates import UpdateCheckError, check_latest
         try:
             current = json.loads((Path(__file__).resolve().parent / 'package.json').read_text())['version']
             return {'ok': True, 'data': await asyncio.to_thread(check_latest, current)}
+        except UpdateCheckError as exc:
+            log.warning('Release check failed: %s', exc)
+            return {'ok': False, 'error': 'update_unavailable', 'failure': exc.failures}
         except Exception:
-            return {'ok': False, 'error': 'update_unavailable'}
+            log.exception('Release check failed internally')
+            return {'ok': False, 'error': 'update_unavailable',
+                    'failure': {'api': 'internal_error', 'fallback': 'not_attempted'}}
 
     async def maintenance(self, action, version=None):
         def schedule():
