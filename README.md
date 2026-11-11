@@ -41,7 +41,18 @@ Run as your normal desktop user in SteamOS Konsole:
 curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/main/install-latest.sh | bash
 ```
 
-The installer verifies the release SHA-256 and restarts Decky. Updates retain mappings and management preference without resetting the controller. Save work, reboot the handheld and check plugin status. Installation completion does not confirm that mappings were applied. For a custom Decky home, use `bash -s -- install --decky-home /absolute/homebrew`.
+Updates retain mappings and the management preference. After installation, save your work and reboot the handheld.
+
+<details>
+<summary>Advanced: custom Decky directory</summary>
+
+The default Decky directory is `~/homebrew`. Specify a directory only if Decky is installed elsewhere. Replace the example path below with your actual Decky directory.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/sekirofly/msi-claw-a8-controller-suite/main/install-latest.sh | bash -s -- install --decky-home /absolute/homebrew
+```
+
+</details>
 
 ### Offline installation
 

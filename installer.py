@@ -15,7 +15,7 @@ import urllib.error
 import time
 import zipfile
 
-VERSION = "0.1.7"
+VERSION = "0.1.8"
 REPO = "https://github.com/sekirofly/msi-claw-a8-controller-suite"
 NAME = "MSI Claw A8 Controller Suite"
 FOLDER = "msi-claw-a8-controller-suite"
