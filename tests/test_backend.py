@@ -17,6 +17,19 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         self.plugin.ip=SimpleNamespace(enabled=True, reconcile=lambda rules:self.applied.append(rules))
         self.plugin.status=lambda:{'config':self.plugin.store.snapshot(),'apply_error':self.plugin.apply_error}
 
+    async def test_update_check_does_not_initialize_or_mutate_controller(self):
+        with patch.object(self.plugin, 'setup', side_effect=AssertionError('device access')), \
+             patch('backend.updates.check_latest', return_value={'available': True}) as check:
+            result = await self.plugin.check_update()
+        self.assertEqual(result, {'ok': True, 'data': {'available': True}})
+        check.assert_called_once()
+        self.assertEqual(self.applied, [])
+        self.assertFalse(self.plugin.lock.locked())
+        with patch('backend.updates.check_latest', side_effect=TimeoutError):
+            result = await self.plugin.check_update()
+        self.assertEqual(result, {'ok': False, 'error': 'update_unavailable'})
+        self.assertEqual(self.applied, [])
+
     async def test_status_reuses_one_fresh_hardware_discovery(self):
         identity = {'usb': 'internal', 'events': []}
         self.plugin.ip = SimpleNamespace(enabled=True, ready=True, restore_pending=False,
