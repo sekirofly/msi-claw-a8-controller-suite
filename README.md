@@ -1,5 +1,8 @@
 # MSI Claw A8 Controller Suite
 
+[![release](https://img.shields.io/github/v/release/sekirofly/msi-claw-a8-controller-suite?style=for-the-badge&label=release&color=C2410C&labelColor=141417)](https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest)
+[![downloads](https://img.shields.io/github/downloads/sekirofly/msi-claw-a8-controller-suite/total?style=for-the-badge&label=downloads&color=15803D&labelColor=141417)](https://github.com/sekirofly/msi-claw-a8-controller-suite/releases)
+
 A Decky plugin for the embedded controller on **MSI Claw A8 (BZ2EM / MS-1T8K)**. Community software, not an MSI product; other Claw models are outside the supported scope.
 
 [简体中文](README.zh-CN.md)

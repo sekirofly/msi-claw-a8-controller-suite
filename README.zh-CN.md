@@ -1,5 +1,8 @@
 # MSI Claw A8 Controller Suite
 
+[![最新版本](https://img.shields.io/github/v/release/sekirofly/msi-claw-a8-controller-suite?style=for-the-badge&label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC&color=C2410C&labelColor=141417)](https://github.com/sekirofly/msi-claw-a8-controller-suite/releases/latest)
+[![累计下载](https://img.shields.io/github/downloads/sekirofly/msi-claw-a8-controller-suite/total?style=for-the-badge&label=%E7%B4%AF%E8%AE%A1%E4%B8%8B%E8%BD%BD&color=15803D&labelColor=141417)](https://github.com/sekirofly/msi-claw-a8-controller-suite/releases)
+
 MSI Claw A8（BZ2EM / MS-1T8K）内置手柄的 Decky 插件。本项目非 MSI 官方产品，不支持将其他 Claw 型号视为已兼容设备。
 
 [English](README.md)
