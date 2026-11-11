@@ -5,7 +5,7 @@ import {callable, definePlugin, routerHook} from '@decky/api';
 
 import {monitorGame} from './game-monitor';
 
-const VERSION = '0.1.6';
+const VERSION = '0.1.7';
 const route = '/msi-claw-a8-controller-suite';
 const t = (zh: string, en: string) => /^zh(?:[-_]|$)/i.test(navigator.language) ? zh : en;
 type Rules = Record<string, string[]>;
@@ -38,8 +38,9 @@ const manage = callable<[boolean], Result<State>>('set_management');
 const maintenance = callable<[string, string?], Result<boolean>>('maintenance');
 const reportGame = callable<[string | null, string], Result<unknown>>('report_game');
 type UpdateInfo = {current: string; latest: string; available: boolean};
-const fetchUpdate = callable<[], Result<UpdateInfo>>('check_update');
-let updateStatus: {checking: boolean; result?: UpdateInfo; failed?: boolean; updating?: boolean; installError?: string} = {checking: false};
+type UpdateFailure = {api: string; fallback: string};
+const fetchUpdate = callable<[], Result<UpdateInfo>&{failure?:UpdateFailure}>('check_update');
+let updateStatus: {checking: boolean; result?: UpdateInfo; failed?: boolean; failure?: UpdateFailure; updating?: boolean; installError?: string} = {checking: false};
 const updateListeners = new Set<() => void>();
 function publishUpdate(){updateListeners.forEach(fn=>fn());}
 async function checkUpdates(){
@@ -47,7 +48,7 @@ async function checkUpdates(){
   updateStatus={checking:true};publishUpdate();
   try {
     const response=await fetchUpdate();
-    if(!response.ok)throw new Error('update_unavailable');
+    if(!response.ok){updateStatus={...updateStatus,checking:false,failed:true,failure:response.failure};publishUpdate();return;}
     updateStatus={...updateStatus,checking:false,result:response.data,failed:undefined};
   }catch{updateStatus={...updateStatus,checking:false,failed:true};}
   publishUpdate();
@@ -161,14 +162,29 @@ async function installUpdate(version:string){
   try {await flushRumble();await enqueue(()=>maintenance('update',version));}
   catch(e){updateStatus={...updateStatus,updating:false,installError:String(e)};publishUpdate();}
 }
+function updateFailureText(code:string){
+  const messages:Record<string,[string,string]>={
+    timeout:['请求超时','Request timed out'], dns:['域名解析失败','DNS lookup failed'],
+    proxy:['代理连接失败','Proxy connection failed'], connection:['无法连接服务器','Connection failed'],
+    tls:['TLS 连接失败','TLS connection failed'], tls_certificate:['证书验证失败','Certificate verification failed'],
+    curl_missing:['系统缺少 curl','System curl is missing'], invalid_response:['服务器响应无法识别','Unrecognized server response'],
+    response_too_large:['响应超过大小限制','Response exceeded size limit'], redirects:['重定向次数超限','Too many redirects'],
+    internal_error:['插件内部错误，请查看 Decky 日志','Internal error; check Decky logs'], not_attempted:['未执行','Not attempted'],
+    http_error:['HTTP 请求失败','HTTP request failed'],
+  };
+  if(/^http_[0-9]{3}$/.test(code))return 'HTTP '+code.slice(5);
+  return messages[code]?t(...messages[code]):code;
+}
 function UpdatePanel({disabled=false}:{disabled?:boolean}){
-  const {checking,result,failed,updating,installError}=useUpdateStatus();
+  const {checking,result,failed,failure,updating,installError}=useUpdateStatus();
   return <PanelSection title={t('插件更新','Plugin updates')+' · v'+VERSION}>
     {updating?row(t('正在更新，请等待 Decky 自动重启，暂时不要操作。','Updating. Wait for Decky to restart; avoid operating the plugin.')):<>
       {result&&row(result.available
         ?t('发现新版本：v','New version available: v')+result.latest
         :t('已是最新版本','You are up to date'))}
-      {failed&&row(t('检查失败，请检查网络后重试。','Check failed. Check your connection and retry.'))}
+      {failed&&row(t('检查失败。','Check failed.')+(failure
+        ?' GitHub API: '+updateFailureText(failure.api)+t('；发布页：','; release page: ')+updateFailureText(failure.fallback)
+        :t('请重试；若持续失败，请查看 Decky 日志。',' Retry; if this persists, check Decky logs.')))}
       {installError&&row(installError)}
       {result?.available&&<PanelSectionRow><ButtonItem layout="below" disabled={disabled||checking} onClick={()=>confirm(
         t('更新到 v','Update to v')+result.latest+'?',

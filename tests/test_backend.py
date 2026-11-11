@@ -27,7 +27,13 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.plugin.lock.locked())
         with patch('backend.updates.check_latest', side_effect=TimeoutError):
             result = await self.plugin.check_update()
-        self.assertEqual(result, {'ok': False, 'error': 'update_unavailable'})
+        self.assertEqual(result['error'], 'update_unavailable')
+        self.assertEqual(result['failure']['api'], 'internal_error')
+        from backend.updates import UpdateCheckError
+        with patch('backend.updates.check_latest', side_effect=UpdateCheckError('http_403', 'timeout')):
+            result = await self.plugin.check_update()
+        self.assertEqual(result['failure'], {'api': 'http_403', 'fallback': 'timeout'})
+
         self.assertEqual(self.applied, [])
 
     async def test_update_schedules_pinned_install_without_controller_reset(self):
